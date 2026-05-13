@@ -1,27 +1,12 @@
 {
   "name": "pensieve",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
-  },
-  "dependencies": {
-    "next": "16.2.4",
-    "openai": "^4.40.0",
-    "react": "^19",
-    "react-dom": "^19"
-  },
-  "devDependencies": {
-    "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "eslint": "^9",
-    "eslint-config-next": "16.2.4",
-    "tailwindcss": "^4",
-    "typescript": "^5"
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "db:up": "docker compose up -d",
+    "db:migrate": "cd backend && npm run db:migrate",
+    "setup": "npm run db:up && sleep 3 && npm run db:migrate"
   }
 }
