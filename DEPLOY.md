@@ -6,7 +6,7 @@ Push to `main` → Vercel builds and deploys automatically once the repo is link
 
 1. [vercel.com/new](https://vercel.com/new) → Import `Pensieve` repo
 2. **Root Directory**: `.` (repo root)
-3. Framework Preset: **Other** (uses `vercel.json`)
+3. Framework Preset: **Other** (uses `vercel.json`; API entry is `api/index.ts`)
 4. Deploy once (will fail until env + DB are set)
 
 ## 2. Add Postgres (Neon)
