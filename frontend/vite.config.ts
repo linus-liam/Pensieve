@@ -6,7 +6,8 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      "/api": "http://localhost:3001",
+      // In Docker the backend is reachable by service name; override via env.
+      "/api": process.env.BACKEND_URL ?? "http://localhost:3001",
     },
   },
 });
