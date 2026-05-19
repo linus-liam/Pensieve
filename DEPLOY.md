@@ -6,7 +6,7 @@ Push to `main` → Vercel builds and deploys automatically once the repo is link
 
 1. [vercel.com/new](https://vercel.com/new) → Import `Pensieve` repo
 2. **Root Directory**: `.` (repo root)
-3. Framework Preset: **Other** (uses `vercel.json`)
+3. Framework Preset: **Other** (uses `vercel.json`; API entry is `api/index.ts`)
 4. Deploy once (will fail until env + DB are set)
 
 ## 2. Add Postgres (Neon)
@@ -29,7 +29,8 @@ In Vercel → **Settings** → **Environment Variables**:
 
 **Deployments** → latest → **Redeploy** (or push an empty commit).
 
-Build runs: backend compile → DB migrate → frontend build → copy to `public/`.
+Build runs: backend compile → frontend build → copy to `public/`.
+The API initializes the database schema on first request, so preview builds do not need direct database access during `vercel build`.
 
 ## 5. Verify
 
