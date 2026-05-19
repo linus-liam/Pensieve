@@ -21,6 +21,7 @@ frontend/.env
 # vite
 frontend/dist/
 frontend/.vite/
+public/
 
 # build output
 /build
