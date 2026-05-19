@@ -8,6 +8,7 @@ import authRouter from "./routes/auth.js";
 import chatsRouter from "./routes/chats.js";
 import messagesRouter from "./routes/messages.js";
 import { pool } from "./db/client.js";
+import { ensureSchema } from "./db/ensureSchema.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { apiRateLimit } from "./middleware/rateLimit.js";
 
@@ -22,6 +23,10 @@ if (!configuredSessionSecret) {
 const sessionSecret = configuredSessionSecret;
 const PgSession = connectPgSimple(session);
 
+const corsOrigin =
+  process.env.FRONTEND_URL ??
+  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:5173");
+
 export function createApp() {
   const app = express();
 
@@ -29,7 +34,7 @@ export function createApp() {
   app.use(helmet());
   app.use(
     cors({
-      origin: process.env.FRONTEND_URL ?? "http://localhost:5173",
+      origin: corsOrigin,
       credentials: true,
     })
   );
@@ -54,6 +59,11 @@ export function createApp() {
     })
   );
 
+  // Serverless (Vercel) has no migrate step; lazily ensure the schema exists.
+  app.use("/api", (_req, _res, next) => {
+    ensureSchema().then(() => next(), next);
+  });
+
   app.use("/api", apiRateLimit);
   app.use("/api/auth", authRouter);
   app.use("/api/chats", chatsRouter);
@@ -69,3 +79,7 @@ export function createApp() {
 
   return app;
 }
+
+// Default instance for the Vercel serverless entry (api/index.ts).
+const app = createApp();
+export default app;
