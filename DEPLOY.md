@@ -29,7 +29,8 @@ In Vercel → **Settings** → **Environment Variables**:
 
 **Deployments** → latest → **Redeploy** (or push an empty commit).
 
-Build runs: backend compile → DB migrate → frontend build → copy to `public/`.
+Build runs: backend compile → frontend build → copy to `public/`.
+The API initializes the database schema on first request, so preview builds do not need direct database access during `vercel build`.
 
 ## 5. Verify
 

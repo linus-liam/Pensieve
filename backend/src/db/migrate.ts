@@ -1,11 +1,6 @@
-import { readFileSync } from "fs";
-import { fileURLToPath } from "url";
-import { dirname, join } from "path";
 import { pool } from "./client.js";
+import { schemaSql } from "./schema.js";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const sql = readFileSync(join(__dirname, "schema.sql"), "utf8");
-
-await pool.query(sql);
+await pool.query(schemaSql);
 console.log("Migration complete.");
 await pool.end();
