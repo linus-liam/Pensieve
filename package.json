@@ -11,10 +11,10 @@
     "dev:backend": "cd backend && npm run dev",
     "dev:frontend": "cd frontend && npm run dev",
     "db:up": "docker compose up -d",
-    "db:migrate": "npm run db:migrate:dev --prefix backend",
+    "db:migrate": "npm run db:migrate --prefix backend",
     "setup": "npm run db:up && sleep 3 && npm run db:migrate",
     "build:backend": "npm run build --prefix backend",
     "build:frontend": "npm run build --prefix frontend",
-    "vercel-build": "npm run build:backend && npm run db:migrate --prefix backend && npm run build:frontend && rm -rf public && mkdir -p public && cp -r frontend/dist/* public/"
+    "vercel-build": "npm run build:backend && npm run db:migrate:prod --prefix backend && npm run build:frontend && rm -rf public && mkdir -p public && cp -r frontend/dist/* public/"
   }
 }
