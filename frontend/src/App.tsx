@@ -1,8 +1,10 @@
 import { useState, useCallback } from "react";
 import type { Theme } from "./types";
 import { tokens } from "./tokens/colors";
+import { useAuth } from "./hooks/useAuth";
 import { useChats } from "./hooks/useChats";
 import { AppLayout } from "./components/layout/AppLayout";
+import { AuthForm } from "./components/auth/AuthForm";
 import { Sidebar } from "./components/sidebar/Sidebar";
 import { ChatPanel } from "./components/chat/ChatPanel";
 
@@ -10,7 +12,10 @@ export function App() {
   const [mode, setMode] = useState<Theme>("light");
   const t = tokens[mode];
 
-  const { chats, activeChatId, selectChat, createChat, refreshChats } = useChats();
+  const auth = useAuth();
+  const { chats, activeChatId, selectChat, createChat, refreshChats, clearChats } = useChats(
+    Boolean(auth.user)
+  );
   const activeChat = chats.find((c) => c.id === activeChatId) ?? null;
 
   const handleNewChat = useCallback(async () => {
@@ -21,6 +26,34 @@ export function App() {
     setMode((m) => (m === "light" ? "dark" : "light"));
   }, []);
 
+  const handleLogout = useCallback(async () => {
+    await auth.logout();
+    clearChats();
+  }, [auth, clearChats]);
+
+  if (auth.loading) {
+    return (
+      <div
+        style={{
+          width: "100vw",
+          height: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: t.paper,
+          color: t.inkSoft,
+          fontFamily: '"Source Serif 4", Georgia, serif',
+        }}
+      >
+        Loading Pensieve…
+      </div>
+    );
+  }
+
+  if (!auth.user) {
+    return <AuthForm t={t} onLogin={auth.login} onRegister={auth.register} />;
+  }
+
   return (
     <AppLayout
       t={t}
@@ -30,8 +63,10 @@ export function App() {
           activeChatId={activeChatId}
           t={t}
           mode={mode}
+          userEmail={auth.user.email}
           onNewChat={handleNewChat}
           onSelectChat={selectChat}
+          onLogout={handleLogout}
         />
       }
       main={

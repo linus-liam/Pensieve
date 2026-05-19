@@ -1,20 +1,20 @@
 import "dotenv/config";
-import express from "express";
-import cors from "cors";
-import chatsRouter from "./routes/chats.js";
-import messagesRouter from "./routes/messages.js";
+import { createApp } from "./app.js";
+import { pool } from "./db/client.js";
 
-const app = express();
 const PORT = process.env.PORT ?? 3001;
+const app = createApp();
 
-app.use(cors({ origin: process.env.FRONTEND_URL ?? "http://localhost:5173" }));
-app.use(express.json());
-
-app.use("/api/chats", chatsRouter);
-app.use("/api/chats/:chatId/messages", messagesRouter);
-
-app.get("/api/health", (_req, res) => res.json({ ok: true }));
-
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Pensieve backend running on http://localhost:${PORT}`);
 });
+
+async function shutdown() {
+  server.close(async () => {
+    await pool.end();
+    process.exit(0);
+  });
+}
+
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);

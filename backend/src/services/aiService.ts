@@ -1,6 +1,29 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { AppError } from "../errors.js";
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const AI_TIMEOUT_MS = Number(process.env.AI_TIMEOUT_MS ?? 60_000);
+const MAX_HISTORY_MESSAGES = Number(process.env.AI_HISTORY_MESSAGES ?? 20);
+const MAX_TITLE_INPUT_CHARS = 600;
+let client: Anthropic | null = null;
+
+function getClient(): Anthropic {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    throw new AppError(500, "Anthropic API key is not configured", "ai_not_configured");
+  }
+
+  client ??= new Anthropic({ apiKey, timeout: AI_TIMEOUT_MS, maxRetries: 1 });
+  return client;
+}
+
+async function withAIErrorHandling<T>(operation: () => Promise<T>): Promise<T> {
+  try {
+    return await operation();
+  } catch (error) {
+    if (error instanceof AppError) throw error;
+    throw new AppError(503, "AI provider unavailable", "ai_unavailable");
+  }
+}
 
 const SYSTEM_PROMPT = `You are a gentle, grounded companion helping someone work through anxious thoughts.
 
@@ -22,12 +45,18 @@ export interface ConversationMessage {
 }
 
 export async function getAIReply(history: ConversationMessage[]): Promise<string> {
-  const response = await client.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 256,
-    system: SYSTEM_PROMPT,
-    messages: history.map((m) => ({ role: m.role, content: m.content })),
-  });
+  const trimmedHistory = history.slice(-MAX_HISTORY_MESSAGES);
+  const response = await withAIErrorHandling(() =>
+    getClient().messages.create(
+      {
+        model: "claude-sonnet-4-6",
+        max_tokens: 256,
+        system: SYSTEM_PROMPT,
+        messages: trimmedHistory.map((m) => ({ role: m.role, content: m.content })),
+      },
+      { timeout: AI_TIMEOUT_MS }
+    )
+  );
 
   const block = response.content[0];
   if (block.type !== "text") throw new Error("Unexpected response type");
@@ -35,18 +64,26 @@ export async function getAIReply(history: ConversationMessage[]): Promise<string
 }
 
 export async function generateTitle(firstUserMessage: string): Promise<string> {
-  const response = await client.messages.create({
-    model: "claude-haiku-4-5-20251001",
-    max_tokens: 32,
-    messages: [
+  const safeInput = firstUserMessage.slice(0, MAX_TITLE_INPUT_CHARS);
+  const response = await withAIErrorHandling(() =>
+    getClient().messages.create(
       {
-        role: "user",
-        content: `Generate a short, evocative title (4-7 words, no quotes) for a journal entry that starts with this thought: "${firstUserMessage}"`,
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 32,
+        system: "Generate short journal titles. Return only the title text.",
+        messages: [
+          {
+            role: "user",
+            content: `Create a 4-7 word title for this journal entry opening:\n\n${safeInput}`,
+          },
+        ],
       },
-    ],
-  });
+      { timeout: AI_TIMEOUT_MS }
+    )
+  );
 
   const block = response.content[0];
   if (block.type !== "text") return "New entry";
-  return block.text.trim().replace(/^["']|["']$/g, "");
+  const title = block.text.trim().replace(/^["']|["']$/g, "").slice(0, 120);
+  return title || "New entry";
 }

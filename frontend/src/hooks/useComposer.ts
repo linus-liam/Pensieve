@@ -5,9 +5,13 @@ interface ComposerState {
   setValue: (v: string) => void;
   ref: RefObject<HTMLTextAreaElement>;
   handleKey: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
+  submit: () => Promise<void>;
 }
 
-export function useComposer(onSubmit: (text: string) => void, maxRows = 6): ComposerState {
+export function useComposer(
+  onSubmit: (text: string) => boolean | Promise<boolean>,
+  maxRows = 6
+): ComposerState {
   const [value, setValue] = useState("");
   const ref = useRef<HTMLTextAreaElement>(null);
 
@@ -20,14 +24,20 @@ export function useComposer(onSubmit: (text: string) => void, maxRows = 6): Comp
     el.style.height = Math.min(el.scrollHeight, max) + "px";
   }, [value, maxRows]);
 
+  const submit = async () => {
+    const current = value;
+    if (!current.trim()) return;
+
+    const sent = await onSubmit(current);
+    if (sent) setValue("");
+  };
+
   const handleKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      const v = value;
-      setValue("");
-      onSubmit(v);
+      void submit();
     }
   };
 
-  return { value, setValue, ref, handleKey };
+  return { value, setValue, ref, handleKey, submit };
 }

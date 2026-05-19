@@ -5,6 +5,7 @@ services:
       POSTGRES_DB: pensieve
       POSTGRES_USER: pensieve
       POSTGRES_PASSWORD: pensieve
+    # Local development only. Do not publish Postgres directly in production.
     ports:
       - "5432:5432"
     volumes:
@@ -19,7 +20,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile.dev
-    command: npm run db:migrate
+    command: sh -c "npm ci && npm run db:migrate"
     environment:
       DB_HOST: postgres
       DB_PORT: 5432
@@ -38,6 +39,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile.dev
+    command: sh -c "npm ci && npm run dev"
     environment:
       DB_HOST: postgres
       DB_PORT: 5432
@@ -62,6 +64,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile.dev
+    command: sh -c "npm ci && npm run dev -- --host"
     environment:
       BACKEND_URL: http://backend:3001
     ports:

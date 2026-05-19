@@ -10,8 +10,10 @@ interface Props {
   activeChatId: string | null;
   t: ColorTokens;
   mode: Theme;
+  userEmail: string;
   onNewChat: () => void;
   onSelectChat: (id: string) => void;
+  onLogout: () => void;
 }
 
 function groupChats(chats: Chat[], query: string) {
@@ -35,7 +37,16 @@ function groupChats(chats: Chat[], query: string) {
   };
 }
 
-export function Sidebar({ chats, activeChatId, t, mode, onNewChat, onSelectChat }: Props) {
+export function Sidebar({
+  chats,
+  activeChatId,
+  t,
+  mode,
+  userEmail,
+  onNewChat,
+  onSelectChat,
+  onLogout,
+}: Props) {
   const [query, setQuery] = useState("");
   const groups = groupChats(chats, query);
 
@@ -71,6 +82,48 @@ export function Sidebar({ chats, activeChatId, t, mode, onNewChat, onSelectChat 
         <HistoryGroup label="Yesterday" chats={groups.yesterday} activeChatId={activeChatId} t={t} mode={mode} onSelect={onSelectChat} />
         <HistoryGroup label="This week" chats={groups.week} activeChatId={activeChatId} t={t} mode={mode} onSelect={onSelectChat} />
         <HistoryGroup label="Older" chats={groups.older} activeChatId={activeChatId} t={t} mode={mode} onSelect={onSelectChat} />
+      </div>
+
+      <div
+        style={{
+          marginTop: "auto",
+          paddingTop: 12,
+          borderTop: `1px solid ${t.rule}`,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 8,
+        }}
+      >
+        <div
+          style={{
+            fontFamily: '"Source Serif 4", Georgia, serif',
+            fontSize: 13,
+            color: t.ink,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            minWidth: 0,
+          }}
+        >
+          {userEmail}
+        </div>
+        <button
+          onClick={onLogout}
+          title="Sign out"
+          style={{
+            all: "unset",
+            cursor: "pointer",
+            fontFamily: '"Source Serif 4", Georgia, serif',
+            fontSize: 13,
+            color: t.inkSoft,
+            paddingBottom: 2,
+            borderBottom: `1px solid ${t.rule}`,
+            flexShrink: 0,
+          }}
+        >
+          Sign out
+        </button>
       </div>
     </aside>
   );

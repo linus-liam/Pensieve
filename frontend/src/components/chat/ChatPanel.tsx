@@ -25,8 +25,9 @@ export function ChatPanel({ chat, t, mode, onToggleTheme, onNewChat, onChatUpdat
   }, [chat?.id, loadMessages]);
 
   const handleSend = async (text: string) => {
-    await send(text);
-    onChatUpdated();
+    const sent = await send(text);
+    if (sent) onChatUpdated();
+    return sent;
   };
 
   return (
