@@ -4,11 +4,11 @@ import { useComposer } from "../../hooks/useComposer";
 interface Props {
   t: ColorTokens;
   pending: boolean;
-  onSend: (text: string) => void;
+  onSend: (text: string) => Promise<boolean>;
 }
 
 export function Composer({ t, pending, onSend }: Props) {
-  const { value, setValue, ref, handleKey } = useComposer(onSend);
+  const { value, setValue, ref, handleKey, submit } = useComposer(onSend);
 
   const canSend = !pending && value.trim().length > 0;
 
@@ -50,11 +50,7 @@ export function Composer({ t, pending, onSend }: Props) {
           />
           <button
             disabled={!canSend}
-            onClick={() => {
-              const v = value;
-              setValue("");
-              onSend(v);
-            }}
+            onClick={() => void submit()}
             style={{
               all: "unset",
               cursor: canSend ? "pointer" : "default",
@@ -78,12 +74,9 @@ export function Composer({ t, pending, onSend }: Props) {
             letterSpacing: "0.12em",
             textTransform: "uppercase",
             color: t.inkFaint,
-            display: "flex",
-            justifyContent: "space-between",
           }}
         >
           <span>shift + ↵ for a new line</span>
-          <span>nothing leaves this page</span>
         </div>
       </div>
     </div>

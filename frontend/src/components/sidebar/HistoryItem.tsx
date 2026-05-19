@@ -22,6 +22,7 @@ export function HistoryItem({ chat, active, t, mode, onClick }: Props) {
             ? "rgba(122,59,29,0.06)"
             : "rgba(214,138,92,0.08)"
           : "transparent",
+        transition: "background 0.2s ease, border-color 0.2s ease",
         display: "block",
         width: "100%",
       }}
@@ -31,8 +32,9 @@ export function HistoryItem({ chat, active, t, mode, onClick }: Props) {
           fontFamily: '"Source Serif 4", Georgia, serif',
           fontSize: 13,
           lineHeight: 1.25,
-          color: t.ink,
-          fontStyle: active ? "italic" : "normal",
+          color: active ? t.accent : t.ink,
+          fontWeight: active ? 500 : 400,
+          transition: "color 0.2s ease, font-weight 0.2s ease",
           overflow: "hidden",
           textOverflow: "ellipsis",
           whiteSpace: "nowrap",

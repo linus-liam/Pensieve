@@ -1,29 +1,32 @@
 import { Router } from "express";
-import { listChats, createChat, updateChatTitle, getMessages } from "../services/chatService.js";
+import { listChats, createChat, getMessages } from "../services/chatService.js";
+import { asyncHandler } from "../middleware/asyncHandler.js";
+import { requireAuth } from "../middleware/auth.js";
+import { parsePagination, requireText, requireUuid } from "../utils/validation.js";
 
 const router = Router();
 
-router.get("/", async (_req, res) => {
-  const chats = await listChats();
+router.use(requireAuth);
+
+router.get("/", asyncHandler(async (req, res) => {
+  const { limit, offset } = parsePagination(req.query);
+  const chats = await listChats(req.user!.id, limit, offset);
   res.json(chats);
-});
+}));
 
-router.post("/", async (req, res) => {
-  const chat = await createChat(req.body?.title);
+router.post("/", asyncHandler(async (req, res) => {
+  const title =
+    typeof req.body?.title === "string" && req.body.title.trim()
+      ? requireText(req.body.title, "title", 120)
+      : "New entry";
+  const chat = await createChat(req.user!.id, title);
   res.status(201).json(chat);
-});
+}));
 
-router.patch("/:id/title", async (req, res) => {
-  const { title } = req.body ?? {};
-  if (!title) return res.status(400).json({ error: "title required" });
-  const chat = await updateChatTitle(req.params.id, title);
-  if (!chat) return res.status(404).json({ error: "not found" });
-  res.json(chat);
-});
-
-router.get("/:id/messages", async (req, res) => {
-  const messages = await getMessages(req.params.id);
+router.get("/:id/messages", asyncHandler(async (req, res) => {
+  const id = requireUuid(req.params.id, "id");
+  const messages = await getMessages(req.user!.id, id);
   res.json(messages);
-});
+}));
 
 export default router;

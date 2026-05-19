@@ -1,32 +1,36 @@
 import { Router, type Request } from "express";
-import { addMessage, getMessages } from "../services/chatService.js";
+import { addMessage, getMessages, updateChatTitle, withTransaction } from "../services/chatService.js";
 import { getAIReply, generateTitle } from "../services/aiService.js";
-import { updateChatTitle } from "../services/chatService.js";
+import { asyncHandler } from "../middleware/asyncHandler.js";
+import { requireAuth } from "../middleware/auth.js";
+import { messageRateLimit } from "../middleware/rateLimit.js";
+import { requireText, requireUuid } from "../utils/validation.js";
 
 const router = Router({ mergeParams: true });
 
-router.post("/", async (req: Request<{ chatId: string }>, res) => {
-  const { content } = req.body ?? {};
-  const { chatId } = req.params;
+router.use(requireAuth);
 
-  if (!content?.trim()) return res.status(400).json({ error: "content required" });
+router.post("/", messageRateLimit, asyncHandler(async (req: Request<{ chatId: string }>, res) => {
+  const content = requireText(req.body?.content, "content", 8000);
+  const chatId = requireUuid(req.params.chatId, "chatId");
+  const userId = req.user!.id;
 
-  const userMsg = await addMessage(chatId, "user", content.trim());
+  const history = await getMessages(userId, chatId);
+  const nextHistory = [...history, { role: "user" as const, content }];
+  const aiText = await getAIReply(nextHistory.map((m) => ({ role: m.role, content: m.content })));
 
-  const history = await getMessages(chatId);
-  const aiText = await getAIReply(
-    history.map((m) => ({ role: m.role, content: m.content }))
-  );
-  const assistantMsg = await addMessage(chatId, "assistant", aiText);
+  const shouldTitle = history.filter((m) => m.role === "user").length === 0;
+  const title = shouldTitle ? await generateTitle(content) : null;
 
-  // Auto-title from first user message
-  if (history.filter((m) => m.role === "user").length === 1) {
-    generateTitle(content.trim())
-      .then((title) => updateChatTitle(chatId, title))
-      .catch(() => {});
-  }
+  const result = await withTransaction(async (client) => {
+    const userMessage = await addMessage(userId, chatId, "user", content, client);
+    const assistantMessage = await addMessage(userId, chatId, "assistant", aiText, client);
+    const chat = title ? await updateChatTitle(userId, chatId, title, client) : null;
 
-  res.status(201).json({ userMessage: userMsg, assistantMessage: assistantMsg });
-});
+    return { userMessage, assistantMessage, chat };
+  });
+
+  res.status(201).json(result);
+}));
 
 export default router;

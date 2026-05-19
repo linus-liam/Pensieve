@@ -53,28 +53,23 @@ export function ChatHeader({ chat, t, mode, onToggleTheme }: Props) {
           {chat?.title ?? "New entry"}
         </h1>
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <span style={{ fontSize: 11, color: t.inkSoft, fontStyle: "italic" }}>
-          a private space
-        </span>
-        <button
-          onClick={onToggleTheme}
-          title="Toggle light / dark"
-          style={{
-            all: "unset",
-            cursor: "pointer",
-            fontFamily: '"JetBrains Mono", monospace',
-            fontSize: 10,
-            color: t.inkFaint,
-            letterSpacing: "0.08em",
-            padding: "4px 6px",
-            border: `1px solid ${t.rule}`,
-            borderRadius: 3,
-          }}
-        >
-          {mode === "light" ? "dark" : "light"}
-        </button>
-      </div>
+      <button
+        onClick={onToggleTheme}
+        title="Toggle light / dark"
+        style={{
+          all: "unset",
+          cursor: "pointer",
+          fontFamily: '"JetBrains Mono", monospace',
+          fontSize: 10,
+          color: t.inkFaint,
+          letterSpacing: "0.08em",
+          padding: "4px 6px",
+          border: `1px solid ${t.rule}`,
+          borderRadius: 3,
+        }}
+      >
+        {mode === "light" ? "dark" : "light"}
+      </button>
     </header>
   );
 }

@@ -24,6 +24,29 @@ CREATE TABLE IF NOT EXISTS chats (
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+DO $$
+DECLARE
+  legacy_user_id UUID;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_name = 'chats' AND column_name = 'user_id'
+  ) THEN
+    INSERT INTO users (email, password_hash)
+    VALUES ('local@pensieve.dev', 'legacy-login-disabled')
+    ON CONFLICT (email) DO UPDATE SET email = EXCLUDED.email
+    RETURNING id INTO legacy_user_id;
+
+    ALTER TABLE chats ADD COLUMN user_id UUID;
+    UPDATE chats SET user_id = legacy_user_id WHERE user_id IS NULL;
+    ALTER TABLE chats ALTER COLUMN user_id SET NOT NULL;
+    ALTER TABLE chats
+      ADD CONSTRAINT chats_user_id_fkey
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
+  END IF;
+END $$;
+
 CREATE TABLE IF NOT EXISTS messages (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   chat_id     UUID NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
