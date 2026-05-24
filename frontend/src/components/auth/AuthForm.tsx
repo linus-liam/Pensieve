@@ -40,6 +40,10 @@ export function AuthForm({ t, onLogin, onRegister }: Props) {
       setError("Enter your password.");
       return;
     }
+    if (tab === "register" && password.length < 8) {
+      setError("Password must be at least 8 characters.");
+      return;
+    }
 
     setPending(true);
     setError(null);

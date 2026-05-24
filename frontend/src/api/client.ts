@@ -43,6 +43,9 @@ export const api = {
   getMessages: (chatId: string, signal?: AbortSignal) =>
     request<Message[]>(`/chats/${chatId}/messages`, { signal }),
 
+  deleteChat: (chatId: string) =>
+    request<void>(`/chats/${chatId}`, { method: "DELETE" }),
+
   sendMessage: (chatId: string, content: string) =>
     request<{ userMessage: Message; assistantMessage: Message; chat: Chat | null }>(
       `/chats/${chatId}/messages`,

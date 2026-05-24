@@ -8,9 +8,10 @@ interface Props {
   t: ColorTokens;
   mode: Theme;
   onSelect: (id: string) => void;
+  onDelete: (id: string) => void;
 }
 
-export function HistoryGroup({ label, chats, activeChatId, t, mode, onSelect }: Props) {
+export function HistoryGroup({ label, chats, activeChatId, t, mode, onSelect, onDelete }: Props) {
   if (chats.length === 0) return null;
 
   return (
@@ -36,6 +37,7 @@ export function HistoryGroup({ label, chats, activeChatId, t, mode, onSelect }: 
             t={t}
             mode={mode}
             onClick={() => onSelect(chat.id)}
+            onDelete={onDelete}
           />
         ))}
       </div>

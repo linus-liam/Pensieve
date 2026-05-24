@@ -13,6 +13,7 @@ interface Props {
   userEmail: string;
   onNewChat: () => void;
   onSelectChat: (id: string) => void;
+  onDeleteChat: (id: string) => void;
   onLogout: () => void;
 }
 
@@ -45,6 +46,7 @@ export function Sidebar({
   userEmail,
   onNewChat,
   onSelectChat,
+  onDeleteChat,
   onLogout,
 }: Props) {
   const [query, setQuery] = useState("");
@@ -78,10 +80,10 @@ export function Sidebar({
           paddingRight: 6,
         }}
       >
-        <HistoryGroup label="Today" chats={groups.today} activeChatId={activeChatId} t={t} mode={mode} onSelect={onSelectChat} />
-        <HistoryGroup label="Yesterday" chats={groups.yesterday} activeChatId={activeChatId} t={t} mode={mode} onSelect={onSelectChat} />
-        <HistoryGroup label="This week" chats={groups.week} activeChatId={activeChatId} t={t} mode={mode} onSelect={onSelectChat} />
-        <HistoryGroup label="Older" chats={groups.older} activeChatId={activeChatId} t={t} mode={mode} onSelect={onSelectChat} />
+        <HistoryGroup label="Today" chats={groups.today} activeChatId={activeChatId} t={t} mode={mode} onSelect={onSelectChat} onDelete={onDeleteChat} />
+        <HistoryGroup label="Yesterday" chats={groups.yesterday} activeChatId={activeChatId} t={t} mode={mode} onSelect={onSelectChat} onDelete={onDeleteChat} />
+        <HistoryGroup label="This week" chats={groups.week} activeChatId={activeChatId} t={t} mode={mode} onSelect={onSelectChat} onDelete={onDeleteChat} />
+        <HistoryGroup label="Older" chats={groups.older} activeChatId={activeChatId} t={t} mode={mode} onSelect={onSelectChat} onDelete={onDeleteChat} />
       </div>
 
       <div

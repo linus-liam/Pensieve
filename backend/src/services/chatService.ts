@@ -96,6 +96,14 @@ export async function getMessages(
   return rows;
 }
 
+export async function deleteChat(userId: string, id: string): Promise<boolean> {
+  const { rowCount } = await pool.query(
+    "DELETE FROM chats WHERE id = $1 AND user_id = $2",
+    [id, userId]
+  );
+  return (rowCount ?? 0) > 0;
+}
+
 export async function addMessage(
   userId: string,
   chatId: string,

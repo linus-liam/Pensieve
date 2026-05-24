@@ -13,7 +13,7 @@ export function App() {
   const t = tokens[mode];
 
   const auth = useAuth();
-  const { chats, activeChatId, selectChat, createChat, refreshChats, clearChats } = useChats(
+  const { chats, activeChatId, selectChat, createChat, deleteChat, refreshChats, clearChats } = useChats(
     Boolean(auth.user)
   );
   const activeChat = chats.find((c) => c.id === activeChatId) ?? null;
@@ -66,6 +66,7 @@ export function App() {
           userEmail={auth.user.email}
           onNewChat={handleNewChat}
           onSelectChat={selectChat}
+          onDeleteChat={deleteChat}
           onLogout={handleLogout}
         />
       }
