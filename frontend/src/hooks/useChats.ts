@@ -9,6 +9,7 @@ interface UseChatsState {
   error: string | null;
   selectChat: (id: string) => void;
   createChat: () => Promise<string>;
+  deleteChat: (id: string) => Promise<void>;
   refreshChats: () => Promise<void>;
   clearChats: () => void;
 }
@@ -55,11 +56,17 @@ export function useChats(enabled: boolean): UseChatsState {
     setActiveChatId(id);
   }, []);
 
+  const deleteChat = useCallback(async (id: string) => {
+    await api.deleteChat(id);
+    setChats((prev) => prev.filter((c) => c.id !== id));
+    setActiveChatId((prev) => (prev === id ? null : prev));
+  }, []);
+
   const clearChats = useCallback(() => {
     setChats([]);
     setActiveChatId(null);
     setError(null);
   }, []);
 
-  return { chats, activeChatId, loading, error, selectChat, createChat, refreshChats, clearChats };
+  return { chats, activeChatId, loading, error, selectChat, createChat, deleteChat, refreshChats, clearChats };
 }

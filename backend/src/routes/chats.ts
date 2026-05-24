@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { listChats, createChat, getMessages } from "../services/chatService.js";
+import { listChats, createChat, deleteChat, getMessages } from "../services/chatService.js";
 import { asyncHandler } from "../middleware/asyncHandler.js";
 import { requireAuth } from "../middleware/auth.js";
 import { parsePagination, requireText, requireUuid } from "../utils/validation.js";
@@ -27,6 +27,13 @@ router.get("/:id/messages", asyncHandler(async (req, res) => {
   const id = requireUuid(req.params.id, "id");
   const messages = await getMessages(req.user!.id, id);
   res.json(messages);
+}));
+
+router.delete("/:id", asyncHandler(async (req, res) => {
+  const id = requireUuid(req.params.id, "id");
+  const deleted = await deleteChat(req.user!.id, id);
+  if (!deleted) return res.status(404).json({ error: "not found", code: "not_found" });
+  res.status(204).end();
 }));
 
 export default router;

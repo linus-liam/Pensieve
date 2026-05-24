@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: pensieve
     # Local development only. Do not publish Postgres directly in production.
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -68,7 +68,7 @@ services:
     environment:
       BACKEND_URL: http://backend:3001
     ports:
-      - "5173:5173"
+      - "5174:5173"
     volumes:
       - ./frontend:/app
       - /app/node_modules
