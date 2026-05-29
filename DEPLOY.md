@@ -9,11 +9,22 @@ Push to `main` → Vercel builds and deploys automatically once the repo is link
 3. Framework Preset: **Other** (uses `vercel.json`; API entry is `api/index.ts`)
 4. Deploy once (will fail until env + DB are set)
 
-## 2. Add Postgres (Neon)
+## 2. Add Postgres (Supabase)
 
-1. Project → **Storage** → **Create Database** → **Neon Postgres**
-2. Connect to **Production** (and Preview if you want)
-3. Vercel injects `POSTGRES_URL` automatically
+The backend talks to Postgres directly via `pg` (no ORM, no `@supabase/supabase-js`),
+so all you need is the **connection string** — the `anon` / `service_role` keys are not used.
+
+1. Create a project at [supabase.com](https://supabase.com) (set a database password)
+2. **Project Settings → Database → Connection string** → use the **Connection Pooling
+   (Transaction)** value, e.g.
+   `postgresql://postgres.<project-ref>:<password>@aws-0-<region>.pooler.supabase.com:6543/postgres`
+3. Apply the schema to Supabase (run locally with `POSTGRES_URL` pointed at Supabase):
+   ```bash
+   POSTGRES_URL="<your-supabase-url>" npm run db:migrate --prefix backend
+   ```
+   This creates the `users`, `session`, `chats`, and `messages` tables.
+
+> SSL is enabled automatically for `*.supabase.co` / `*.pooler.supabase.com` hosts.
 
 ## 3. Environment variables
 
@@ -22,7 +33,8 @@ In Vercel → **Settings** → **Environment Variables**:
 | Variable | Required | Notes |
 |----------|----------|--------|
 | `ANTHROPIC_API_KEY` | Yes | [Anthropic console](https://console.anthropic.com/) |
-| `POSTGRES_URL` | Yes | Auto-set if Neon is linked |
+| `POSTGRES_URL` | Yes | Supabase pooler connection string |
+| `SESSION_SECRET` | Yes | Long random string for session cookies |
 | `FRONTEND_URL` | Optional | Production URL, e.g. `https://pensieve.vercel.app` |
 
 ## 4. Redeploy
