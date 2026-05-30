@@ -1,10 +1,8 @@
-import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 import type { Express } from "express";
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { AppError } from "../src/errors.js";
+import { schemaSql } from "../src/db/schema.js";
 
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 const runDbTests = testDatabaseUrl ? describe : describe.skip;
@@ -31,11 +29,9 @@ runDbTests("app", () => {
     const dbModule = await import("../src/db/client.js");
     pool = dbModule.pool;
 
-    const __dirname = dirname(fileURLToPath(import.meta.url));
-    const schema = readFileSync(join(__dirname, "../src/db/schema.sql"), "utf8");
     await pool.query("DROP SCHEMA public CASCADE");
     await pool.query("CREATE SCHEMA public");
-    await pool.query(schema);
+    await pool.query(schemaSql);
 
     app = appModule.createApp();
   });

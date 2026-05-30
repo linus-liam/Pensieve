@@ -18,11 +18,11 @@ so all you need is the **connection string** — the `anon` / `service_role` key
 2. **Project Settings → Database → Connection string** → use the **Connection Pooling
    (Transaction)** value, e.g.
    `postgresql://postgres.<project-ref>:<password>@aws-0-<region>.pooler.supabase.com:6543/postgres`
-3. Apply the schema to Supabase (run locally with `POSTGRES_URL` pointed at Supabase):
-   ```bash
-   POSTGRES_URL="<your-supabase-url>" npm run db:migrate --prefix backend
-   ```
-   This creates the `users`, `session`, `chats`, and `messages` tables.
+
+No separate migrate step is needed: the API creates the full schema (`users`,
+`session`, `chats`, `messages`) automatically on the first request against an
+empty database (see `backend/src/db/schema.ts`). To pre-create it explicitly,
+run `POSTGRES_URL="<your-supabase-url>" npm run db:migrate --prefix backend`.
 
 > SSL is enabled automatically for `*.supabase.co` / `*.pooler.supabase.com` hosts.
 
@@ -42,7 +42,8 @@ In Vercel → **Settings** → **Environment Variables**:
 **Deployments** → latest → **Redeploy** (or push an empty commit).
 
 Build runs: backend compile → frontend build → copy to `public/`.
-The API initializes the database schema on first request, so preview builds do not need direct database access during `vercel build`.
+The API creates the full database schema (`users`, `session`, `chats`, `messages`)
+on the first request, so builds do not need direct database access during `vercel build`.
 
 ## 5. Verify
 
