@@ -1,6 +1,6 @@
 # Pensieve
 
-Pensieve is a Vite/React frontend with an Express/Postgres backend that uses Anthropic for assistant replies and generated chat titles.
+Pensieve is a Vite/React frontend with an Express/Postgres backend that uses OpenAI for assistant replies and generated chat titles.
 
 ## Local Setup
 
@@ -10,7 +10,7 @@ Pensieve is a Vite/React frontend with an Express/Postgres backend that uses Ant
    cp backend/.env.example backend/.env
    ```
 
-2. Set `ANTHROPIC_API_KEY` and replace `SESSION_SECRET` with a long random value.
+2. Set `OPENAI_API_KEY` and replace `SESSION_SECRET` with a long random value.
 
 3. Start Postgres and run migrations:
 
@@ -32,8 +32,8 @@ The Docker Postgres password and published `5432` port are for local development
 
 - Users authenticate with a server-side session cookie.
 - Chats are scoped by `user_id`; callers cannot read or write another user's chats by guessing IDs.
-- Message submissions are rate-limited and validated before any Anthropic call.
-- The backend stores chat history in Postgres and sends the relevant conversation window to Anthropic to generate replies.
+- Message submissions are rate-limited and validated before any OpenAI call.
+- The backend stores chat history in Postgres and sends the relevant conversation window to OpenAI to generate replies.
 
 ## Verification
 

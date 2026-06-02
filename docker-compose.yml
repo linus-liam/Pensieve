@@ -48,7 +48,7 @@ services:
       DB_PASSWORD: pensieve
       PORT: 3001
       FRONTEND_URL: http://localhost:5173
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
     ports:
       - "3001:3001"
     volumes:
