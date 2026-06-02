@@ -1,3 +1,4 @@
+import "dotenv/config";
 import pg from "pg";
 
 const { Pool } = pg;
@@ -23,7 +24,7 @@ if (isProduction && !connectionString) {
 function connectionStringWantsSsl(url: string): boolean {
   return (
     /[?&](sslmode=require|sslmode=verify|ssl=true)/i.test(url) ||
-    /\.(neon\.tech|vercel-storage\.com|pooler\.supabase\.com)/i.test(url)
+    /\.(neon\.tech|vercel-storage\.com|pooler\.supabase\.com|supabase\.co)/i.test(url)
   );
 }
 
