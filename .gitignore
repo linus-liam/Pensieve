@@ -46,3 +46,8 @@ yarn-error.log*
 .DS_Store
 *.pem
 .vercel
+
+# agent skills (installed locally via `npx skills add`)
+.agents/
+skills-lock.json
+.cursor/settings.json
