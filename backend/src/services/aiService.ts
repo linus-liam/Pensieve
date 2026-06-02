@@ -1,18 +1,20 @@
-import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import { AppError } from "../errors.js";
 
 const AI_TIMEOUT_MS = Number(process.env.AI_TIMEOUT_MS ?? 60_000);
 const MAX_HISTORY_MESSAGES = Number(process.env.AI_HISTORY_MESSAGES ?? 20);
 const MAX_TITLE_INPUT_CHARS = 600;
-let client: Anthropic | null = null;
+const REPLY_MODEL = process.env.AI_REPLY_MODEL ?? "gpt-4o";
+const TITLE_MODEL = process.env.AI_TITLE_MODEL ?? "gpt-4o-mini";
+let client: OpenAI | null = null;
 
-function getClient(): Anthropic {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+function getClient(): OpenAI {
+  const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
-    throw new AppError(500, "Anthropic API key is not configured", "ai_not_configured");
+    throw new AppError(500, "OpenAI API key is not configured", "ai_not_configured");
   }
 
-  client ??= new Anthropic({ apiKey, timeout: AI_TIMEOUT_MS, maxRetries: 1 });
+  client ??= new OpenAI({ apiKey, timeout: AI_TIMEOUT_MS, maxRetries: 1 });
   return client;
 }
 
@@ -47,31 +49,33 @@ export interface ConversationMessage {
 export async function getAIReply(history: ConversationMessage[]): Promise<string> {
   const trimmedHistory = history.slice(-MAX_HISTORY_MESSAGES);
   const response = await withAIErrorHandling(() =>
-    getClient().messages.create(
+    getClient().chat.completions.create(
       {
-        model: "claude-sonnet-4-6",
+        model: REPLY_MODEL,
         max_tokens: 256,
-        system: SYSTEM_PROMPT,
-        messages: trimmedHistory.map((m) => ({ role: m.role, content: m.content })),
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          ...trimmedHistory.map((m) => ({ role: m.role, content: m.content })),
+        ],
       },
       { timeout: AI_TIMEOUT_MS }
     )
   );
 
-  const block = response.content[0];
-  if (block.type !== "text") throw new Error("Unexpected response type");
-  return block.text.trim();
+  const text = response.choices[0]?.message?.content;
+  if (!text) throw new Error("Unexpected response type");
+  return text.trim();
 }
 
 export async function generateTitle(firstUserMessage: string): Promise<string> {
   const safeInput = firstUserMessage.slice(0, MAX_TITLE_INPUT_CHARS);
   const response = await withAIErrorHandling(() =>
-    getClient().messages.create(
+    getClient().chat.completions.create(
       {
-        model: "claude-haiku-4-5-20251001",
+        model: TITLE_MODEL,
         max_tokens: 32,
-        system: "Generate short journal titles. Return only the title text.",
         messages: [
+          { role: "system", content: "Generate short journal titles. Return only the title text." },
           {
             role: "user",
             content: `Create a 4-7 word title for this journal entry opening:\n\n${safeInput}`,
@@ -82,8 +86,8 @@ export async function generateTitle(firstUserMessage: string): Promise<string> {
     )
   );
 
-  const block = response.content[0];
-  if (block.type !== "text") return "New entry";
-  const title = block.text.trim().replace(/^["']|["']$/g, "").slice(0, 120);
+  const text = response.choices[0]?.message?.content;
+  if (!text) return "New entry";
+  const title = text.trim().replace(/^["']|["']$/g, "").slice(0, 120);
   return title || "New entry";
 }

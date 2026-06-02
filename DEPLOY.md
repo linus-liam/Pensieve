@@ -32,7 +32,7 @@ In Vercel → **Settings** → **Environment Variables**:
 
 | Variable | Required | Notes |
 |----------|----------|--------|
-| `ANTHROPIC_API_KEY` | Yes | [Anthropic console](https://console.anthropic.com/) |
+| `OPENAI_API_KEY` | Yes | [OpenAI API keys](https://platform.openai.com/api-keys) |
 | `POSTGRES_URL` | Yes | Supabase pooler connection string |
 | `SESSION_SECRET` | Yes | Long random string for session cookies |
 | `FRONTEND_URL` | Optional | Production URL, e.g. `https://pensieve.vercel.app` |
@@ -54,7 +54,7 @@ on the first request, so builds do not need direct database access during `verce
 
 ```bash
 npm run setup          # Docker Postgres + migrate
-cp backend/.env.example backend/.env   # add ANTHROPIC_API_KEY
+cp backend/.env.example backend/.env   # add OPENAI_API_KEY
 npm run dev:backend    # :3001
 npm run dev:frontend   # :5173
 ```
