@@ -439,7 +439,7 @@ button:disabled {
 .timeline-page {
   width: min(100%, var(--content-max));
   margin: 0 auto;
-  padding: var(--stack-md) var(--container-padding-mobile) 120px;
+  padding: var(--stack-md) var(--container-padding-mobile) var(--stack-lg);
 }
 
 .timeline {
@@ -614,30 +614,6 @@ button:disabled {
   line-height: 1.6;
 }
 
-/* Mobile memories floating nav */
-
-.memories-floating-nav {
-  position: fixed;
-  left: 50%;
-  bottom: calc(32px + env(safe-area-inset-bottom));
-  z-index: 50;
-  display: flex;
-  align-items: center;
-  justify-content: space-around;
-  width: min(90%, 400px);
-  padding: 8px;
-  border-radius: 999px;
-  background: rgba(239, 238, 236, 0.8);
-  box-shadow: var(--shadow-ambient);
-  transform: translateX(-50%);
-  backdrop-filter: blur(12px);
-}
-
-.memories-floating-nav .icon-action {
-  width: 48px;
-  height: 48px;
-}
-
 /* ── Animations ── */
 
 @keyframes fade-in {
@@ -771,7 +747,6 @@ button:disabled {
 
   /* Hide mobile chrome on desktop */
   .top-bar,
-  .memories-floating-nav,
   .capture-floating-bar {
     display: none;
   }

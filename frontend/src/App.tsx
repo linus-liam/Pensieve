@@ -174,29 +174,6 @@ export function App() {
             <main className="timeline-page">
               <Timeline memories={groupedMemories} />
             </main>
-
-            <nav className="memories-floating-nav" aria-label="Quick capture">
-              <button className="icon-action" type="button" aria-label="Record voice note">
-                <span className="material-symbols-outlined" aria-hidden="true">
-                  mic
-                </span>
-              </button>
-              <button
-                className="icon-action icon-action--primary-container"
-                type="button"
-                aria-label="New capture"
-                onClick={() => setPage("capture")}
-              >
-                <span className="material-symbols-outlined" aria-hidden="true">
-                  add_circle
-                </span>
-              </button>
-              <button className="icon-action" type="button" aria-label="Attach photo">
-                <span className="material-symbols-outlined" aria-hidden="true">
-                  image
-                </span>
-              </button>
-            </nav>
           </>
         )}
       </div>
