@@ -270,19 +270,18 @@ button:disabled {
 .capture-page {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  align-items: stretch;
+  justify-content: flex-start;
   width: min(100%, var(--content-max));
   min-height: calc(100dvh - 64px);
   margin: 0 auto;
-  padding: var(--stack-lg) var(--container-padding-mobile) 160px;
+  padding: var(--stack-md) var(--container-padding-mobile) 160px;
 }
 
 .capture-display {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  align-items: flex-start;
   width: 100%;
   animation: fade-in 0.8s var(--spring) both;
 }
@@ -294,7 +293,7 @@ button:disabled {
   font-weight: 500;
   line-height: 1.3;
   color: var(--on-background);
-  text-align: center;
+  text-align: left;
   text-wrap: balance;
 }
 
