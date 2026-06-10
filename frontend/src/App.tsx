@@ -1,65 +1,42 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { api } from "./api/client";
 import { CaptureInput } from "./components/reflection/CaptureInput";
 import { SaveConfirmation } from "./components/reflection/SaveConfirmation";
 import { SideNav } from "./components/reflection/SideNav";
 import { Timeline } from "./components/reflection/Timeline";
-import type { Memory } from "./types";
+import type { Memory, MemoryEntry } from "./types";
 
-type Page = "capture" | "memories";
+type Page = "capture" | "memories" | "detail";
 
-const sampleImage =
-  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 900 560'%3E%3Cdefs%3E%3ClinearGradient id='wall' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop stop-color='%23d7d5cc'/%3E%3Cstop offset='.55' stop-color='%23f4f1e8'/%3E%3Cstop offset='1' stop-color='%23b3aa99'/%3E%3C/linearGradient%3E%3ClinearGradient id='desk' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop stop-color='%23b58d64'/%3E%3Cstop offset='1' stop-color='%2372533b'/%3E%3C/linearGradient%3E%3Cfilter id='soft' x='-20%25' y='-20%25' width='140%25' height='140%25'%3E%3CfeDropShadow dx='0' dy='14' stdDeviation='18' flood-color='%23516052' flood-opacity='.18'/%3E%3C/filter%3E%3C/defs%3E%3Crect width='900' height='560' fill='url(%23wall)'/%3E%3Cpath d='M430 0h470v430H270z' fill='%23fffaf1' opacity='.45'/%3E%3Cpath d='M0 374h900v186H0z' fill='url(%23desk)'/%3E%3Cg filter='url(%23soft)'%3E%3Cellipse cx='233' cy='398' rx='88' ry='14' fill='%234c3e31' opacity='.25'/%3E%3Cpath d='M166 314h119l-14 88h-91z' fill='%23e3d3bd'/%3E%3Cpath d='M174 314h104l-8 28h-88z' fill='%23b89f80'/%3E%3Cpath d='M178 402h92l-9 18h-74z' fill='%23d8c2a3'/%3E%3Cpath d='M216 310c-64-2-94-40-72-76 20-33 54-10 61 8 9-47 60-61 84-25 19 29-5 66-73 93z' fill='%234f694f'/%3E%3Cpath d='M220 312c42-20 73-20 87 5 17 32-33 54-87 28-26 33-78 31-90-1-10-27 26-44 90-32z' fill='%235b7659'/%3E%3Cpath d='M219 315c-19-28-12-76 19-81 38-6 58 50-19 81z' fill='%236f8c68'/%3E%3C/g%3E%3Cg filter='url(%23soft)'%3E%3Cpath d='M452 405c72-35 145-32 214 0v53c-70-29-142-29-214 0z' fill='%23f7f1e4'/%3E%3Cpath d='M666 405c68-31 132-26 193 8v48c-61-30-126-31-193-3z' fill='%23eee4d3'/%3E%3Cpath d='M666 405v53' stroke='%23b9aa93' stroke-width='4'/%3E%3Cpath d='M474 425c48-13 93-13 139 0M704 426c41-11 82-8 123 8' stroke='%23cfc2ad' stroke-width='5' stroke-linecap='round' opacity='.8'/%3E%3C/g%3E%3C/svg%3E";
-
-const initialMemories: Memory[] = [
-  {
-    id: "memory-1",
-    day: "Today",
-    time: "10:42 AM",
-    source: "Text",
-    sourceType: "text",
-    content:
-      "Reflected on the anxiety surrounding the upcoming presentation, realizing it stems from a desire to perfect the narrative rather than fear of public speaking.",
-    tags: ["reflection", "work"],
-  },
-  {
-    id: "memory-2",
-    day: "Today",
-    time: "2:15 PM",
-    source: "Screenshot",
-    sourceType: "screenshot",
-    image: sampleImage,
-    imageAlt: "A quiet desk with a plant and an open notebook in warm light.",
-    content:
-      "Saved an inspiring quote about finding stillness during chaotic days. Need to remember this when feeling overwhelmed by context-switching.",
-    tags: ["inspiration", "mindfulness"],
-  },
-  {
-    id: "memory-3",
-    day: "Yesterday",
-    time: "8:30 PM",
-    source: "Voice note",
-    sourceType: "voice",
-    content:
-      "Talked through a complex emotional response to a friend's feedback. Realized I was projecting past insecurities onto a genuinely helpful suggestion.",
-    tags: ["growth", "relationships"],
-  },
-  {
-    id: "memory-4",
-    day: "This Week",
-    time: "7:12 AM",
-    source: "Photo",
-    sourceType: "photo",
-    content:
-      "A small reminder that the morning felt lighter after clearing the table and opening the windows.",
-    tags: ["home", "stillness"],
-  },
-];
-
-function getCurrentTime() {
+function formatTime(value: string) {
   return new Intl.DateTimeFormat("en-US", {
     hour: "numeric",
     minute: "2-digit",
-  }).format(new Date());
+  }).format(new Date(value));
+}
+
+function getDayLabel(value: string) {
+  const date = new Date(value);
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+
+  const isSameDay = (a: Date, b: Date) =>
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate();
+
+  if (isSameDay(date, today)) return "Today";
+  if (isSameDay(date, yesterday)) return "Yesterday";
+
+  const diffMs = today.getTime() - date.getTime();
+  if (diffMs < 1000 * 60 * 60 * 24 * 7) return "This Week";
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: today.getFullYear() === date.getFullYear() ? undefined : "numeric",
+  }).format(date);
 }
 
 function inferTags(content: string) {
@@ -70,57 +47,145 @@ function inferTags(content: string) {
   return ["reflection"];
 }
 
+function toMemory(entry: MemoryEntry): Memory {
+  return {
+    id: entry.id,
+    day: getDayLabel(entry.created_at),
+    time: formatTime(entry.created_at),
+    source: "Text",
+    sourceType: "text",
+    summary: entry.ai_summary,
+    rawInput: entry.raw_input,
+    tags: inferTags(entry.raw_input),
+  };
+}
+
 export function App() {
   const [page, setPage] = useState<Page>("capture");
   const [draft, setDraft] = useState("");
-  const [memories, setMemories] = useState<Memory[]>(initialMemories);
+  const [entries, setEntries] = useState<MemoryEntry[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [detailDraft, setDetailDraft] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [updating, setUpdating] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const canSave = draft.trim().length > 0;
+  const loadEntries = useCallback(async () => {
+    setLoading(true);
+    setError(null);
 
-  const saveMemory = useCallback(() => {
-    const content = draft.trim();
-    if (!content) return;
-
-    if ("vibrate" in navigator) {
-      navigator.vibrate(10);
+    try {
+      const nextEntries = await api.listMemoryEntries();
+      setEntries(nextEntries);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "Could not load memories");
+    } finally {
+      setLoading(false);
     }
+  }, []);
 
-    const memory: Memory = {
-      id: crypto.randomUUID(),
-      day: "Today",
-      time: getCurrentTime(),
-      source: "Text",
-      sourceType: "text",
-      content,
-      tags: inferTags(content),
-    };
+  useEffect(() => {
+    void loadEntries();
+  }, [loadEntries]);
 
-    setMemories((current) => [memory, ...current]);
-    setDraft("");
-    setShowConfirmation(true);
-  }, [draft]);
+  const memories = useMemo(() => entries.map(toMemory), [entries]);
+  const selectedEntry = entries.find((entry) => entry.id === selectedId) ?? null;
+  const selectedMemory = selectedEntry ? toMemory(selectedEntry) : null;
+  const canSave = draft.trim().length > 0;
+  const canUpdate = detailDraft.trim().length > 0 && detailDraft.trim() !== selectedEntry?.raw_input;
 
-  const groupedMemories = useMemo(() => memories, [memories]);
+  const navigate = useCallback((nextPage: Page) => {
+    if (nextPage !== "detail") {
+      setSelectedId(null);
+      setDetailDraft("");
+    }
+    setPage(nextPage);
+  }, []);
+
+  const saveMemory = useCallback(async () => {
+    const rawInput = draft.trim();
+    if (!rawInput || saving) return;
+
+    setSaving(true);
+    setError(null);
+
+    try {
+      const entry = await api.createMemoryEntry(rawInput);
+      setEntries((current) => [entry, ...current]);
+      setDraft("");
+      setShowConfirmation(true);
+      setPage("memories");
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Could not save memory");
+    } finally {
+      setSaving(false);
+    }
+  }, [draft, saving]);
+
+  const openMemory = useCallback((memory: Memory) => {
+    setSelectedId(memory.id);
+    setDetailDraft(memory.rawInput);
+    setPage("detail");
+  }, []);
+
+  const updateMemory = useCallback(async () => {
+    if (!selectedEntry || !canUpdate || updating) return;
+
+    setUpdating(true);
+    setError(null);
+
+    try {
+      const updated = await api.updateMemoryEntry(selectedEntry.id, detailDraft.trim());
+      setEntries((current) =>
+        current.map((entry) => (entry.id === updated.id ? updated : entry))
+      );
+      setDetailDraft(updated.raw_input);
+    } catch (updateError) {
+      setError(updateError instanceof Error ? updateError.message : "Could not update memory");
+    } finally {
+      setUpdating(false);
+    }
+  }, [canUpdate, detailDraft, selectedEntry, updating]);
+
+  const deleteMemory = useCallback(async () => {
+    if (!selectedEntry || updating) return;
+
+    setUpdating(true);
+    setError(null);
+
+    try {
+      await api.deleteMemoryEntry(selectedEntry.id);
+      setEntries((current) => current.filter((entry) => entry.id !== selectedEntry.id));
+      setSelectedId(null);
+      setDetailDraft("");
+      setPage("memories");
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : "Could not delete memory");
+    } finally {
+      setUpdating(false);
+    }
+  }, [selectedEntry, updating]);
 
   return (
     <div className="app-shell">
       <div className="app-atmosphere" aria-hidden="true" />
 
-      <SideNav page={page} onNavigate={setPage} />
+      <SideNav page={page === "detail" ? "memories" : page} onNavigate={navigate} />
 
       <div className="app-content">
         {page === "capture" ? (
           <>
             <header className="top-bar top-bar--capture" aria-label="Primary">
-              <button className="brand-button" type="button" onClick={() => setPage("capture")}>
+              <button className="brand-button" type="button" onClick={() => navigate("capture")}>
                 Pensieve
               </button>
               <button
                 className="nav-pill-button"
                 type="button"
                 aria-label="Open memories"
-                onClick={() => setPage("memories")}
+                onClick={() => navigate("memories")}
               >
                 Memories
               </button>
@@ -136,19 +201,26 @@ export function App() {
             </header>
 
             <main className="capture-page">
-              <CaptureInput value={draft} onChange={setDraft} onSave={saveMemory} canSave={canSave} />
+              <CaptureInput
+                value={draft}
+                onChange={setDraft}
+                onSave={saveMemory}
+                canSave={canSave}
+                saving={saving}
+              />
+              {error ? <p className="inline-error" role="alert">{error}</p> : null}
             </main>
           </>
-        ) : (
+        ) : page === "memories" ? (
           <>
             <header className="top-bar top-bar--timeline" aria-label="Memories">
               <div className="timeline-brand">
-                <button className="icon-button back-button" type="button" aria-label="Back to capture" onClick={() => setPage("capture")}>
+                <button className="icon-button back-button" type="button" aria-label="Back to capture" onClick={() => navigate("capture")}>
                   <span className="material-symbols-outlined" aria-hidden="true">
                     arrow_back
                   </span>
                 </button>
-                <button className="brand-button brand-button--small" type="button" onClick={() => setPage("capture")}>
+                <button className="brand-button brand-button--small" type="button" onClick={() => navigate("capture")}>
                   Pensieve
                 </button>
               </div>
@@ -158,9 +230,9 @@ export function App() {
             <header className="desktop-top-bar desktop-top-bar--memories" aria-label="Memories header">
               <h2 className="desktop-top-bar__title">Memories</h2>
               <div className="desktop-top-bar__actions">
-                <button className="icon-button" type="button" aria-label="Search memories">
+                <button className="icon-button" type="button" aria-label="Refresh memories" onClick={loadEntries}>
                   <span className="material-symbols-outlined" aria-hidden="true">
-                    search
+                    refresh
                   </span>
                 </button>
                 <button className="icon-button" type="button" aria-label="Settings">
@@ -172,7 +244,78 @@ export function App() {
             </header>
 
             <main className="timeline-page">
-              <Timeline memories={groupedMemories} />
+              {error ? <p className="inline-error" role="alert">{error}</p> : null}
+              {loading ? <p className="empty-state">Loading memories...</p> : null}
+              {!loading && memories.length === 0 ? (
+                <p className="empty-state">No memories saved yet.</p>
+              ) : null}
+              {memories.length > 0 ? (
+                <Timeline memories={memories} onOpenMemory={openMemory} />
+              ) : null}
+            </main>
+          </>
+        ) : (
+          <>
+            <header className="top-bar top-bar--timeline" aria-label="Memory detail">
+              <div className="timeline-brand">
+                <button className="icon-button back-button" type="button" aria-label="Back to memories" onClick={() => navigate("memories")}>
+                  <span className="material-symbols-outlined" aria-hidden="true">
+                    arrow_back
+                  </span>
+                </button>
+                <button className="brand-button brand-button--small" type="button" onClick={() => navigate("capture")}>
+                  Pensieve
+                </button>
+              </div>
+              <span className="timeline-title">Detail</span>
+            </header>
+
+            <main className="detail-page">
+              {selectedMemory ? (
+                <article className="detail-panel">
+                  <div className="detail-panel__meta">
+                    <time>{selectedMemory.day} at {selectedMemory.time}</time>
+                  </div>
+
+                  <section className="detail-section" aria-label="AI summary">
+                    <h2>Summary</h2>
+                    <p>{selectedMemory.summary}</p>
+                  </section>
+
+                  <section className="detail-section" aria-label="Original memory">
+                    <h2>Original</h2>
+                    <textarea
+                      className="detail-textarea"
+                      value={detailDraft}
+                      aria-label="Original memory input"
+                      onChange={(event) => setDetailDraft(event.target.value)}
+                    />
+                  </section>
+
+                  {error ? <p className="inline-error" role="alert">{error}</p> : null}
+
+                  <div className="detail-actions">
+                    <button
+                      className="detail-button detail-button--danger"
+                      type="button"
+                      disabled={updating}
+                      onClick={deleteMemory}
+                    >
+                      Delete
+                    </button>
+                    <button
+                      className="detail-button detail-button--primary"
+                      type="button"
+                      disabled={!canUpdate || updating}
+                      onClick={updateMemory}
+                    >
+                      {updating ? "Saving..." : "Save Changes"}
+                    </button>
+                  </div>
+                </article>
+              ) : (
+                <p className="empty-state">Select a memory from the timeline.</p>
+              )}
             </main>
           </>
         )}

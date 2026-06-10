@@ -1,16 +1,19 @@
 # Pensieve
 
-Pensieve is a Vite/React frontend with an Express/Postgres backend that uses OpenAI for assistant replies and generated chat titles.
+Pensieve is a Vite/React memory capture app with an Express/Postgres API. The
+backend stores raw memory entries, asks OpenAI for a one-sentence summary, and
+serves the timeline/detail flow.
 
 ## Local Setup
 
 1. Copy environment defaults:
 
    ```sh
+   cp .env.local.example .env.local
    cp backend/.env.example backend/.env
    ```
 
-2. Set `OPENAI_API_KEY` and replace `SESSION_SECRET` with a long random value.
+2. Set `OPENAI_API_KEY` in `.env.local`.
 
 3. Start Postgres and run migrations:
 
@@ -26,14 +29,46 @@ Pensieve is a Vite/React frontend with an Express/Postgres backend that uses Ope
    npm run dev:frontend
    ```
 
-The Docker Postgres password and published `5432` port are for local development only.
+The local API runs on `http://localhost:3001`; Vite proxies `/api` requests from
+the frontend dev server. Docker publishes local Postgres on host port `5433`,
+so host-run Node commands should use `DB_PORT=5433`.
 
-## Security Model
+The backend loads environment values from root `.env`, root `.env.local`,
+`backend/.env`, and `backend/.env.local`. Put shared local secrets like
+`OPENAI_API_KEY` in root `.env.local`; keep backend-only database defaults in
+`backend/.env`.
 
-- Users authenticate with a server-side session cookie.
-- Chats are scoped by `user_id`; callers cannot read or write another user's chats by guessing IDs.
-- Message submissions are rate-limited and validated before any OpenAI call.
-- The backend stores chat history in Postgres and sends the relevant conversation window to OpenAI to generate replies.
+## Docker Modes
+
+For normal development, use Docker for the database only:
+
+```sh
+npm run db:up
+npm run db:migrate
+npm run dev:backend
+npm run dev:frontend
+```
+
+`npm run db:up` starts only the `postgres` service. It does not start the Docker
+backend or frontend, so it will not occupy local dev ports `3001` or `5173`.
+
+To run the whole app in Docker instead:
+
+```sh
+npm run compose:up
+```
+
+The Docker frontend is exposed at `http://localhost:5174`. The Docker backend is
+only exposed inside the Compose network, so it will not conflict with a local
+backend on `3001`.
+
+## API
+
+- `GET /api/memory-entries` lists memories newest first.
+- `POST /api/memory-entries` saves `rawInput`, generates `ai_summary`, and stores both.
+- `GET /api/memory-entries/:id` opens one memory.
+- `PATCH /api/memory-entries/:id` updates `rawInput` and regenerates the summary.
+- `DELETE /api/memory-entries/:id` removes a memory.
 
 ## Verification
 

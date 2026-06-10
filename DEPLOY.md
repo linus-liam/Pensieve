@@ -1,62 +1,44 @@
-# Deploy Pensieve on Vercel (GitHub)
+# Deploy Pensieve on Vercel
 
-Push to `main` → Vercel builds and deploys automatically once the repo is linked.
+Push to `main` and Vercel builds/deploys automatically once the repo is linked.
 
 ## 1. Link GitHub on Vercel
 
-1. [vercel.com/new](https://vercel.com/new) → Import `Pensieve` repo
-2. **Root Directory**: `.` (repo root)
-3. Framework Preset: **Other** (uses `vercel.json`; API entry is `api/index.ts`)
-4. Deploy once (will fail until env + DB are set)
+1. Go to [vercel.com/new](https://vercel.com/new) and import the `Pensieve` repo.
+2. Set **Root Directory** to `.`.
+3. Use **Framework Preset: Other**. The project uses `vercel.json`.
+4. Deploy once, then add env vars if the first deploy is missing them.
 
-## 2. Add Postgres (Supabase)
+## 2. Add Postgres
 
-The backend talks to Postgres directly via `pg` (no ORM, no `@supabase/supabase-js`),
-so all you need is the **connection string** — the `anon` / `service_role` keys are not used.
+The backend talks to Postgres directly via `pg`, so it only needs a connection
+string. Supabase, Neon, or Vercel Postgres all work.
 
-1. Create a project at [supabase.com](https://supabase.com) (set a database password)
-2. **Project Settings → Database → Connection string** → use the **Connection Pooling
-   (Transaction)** value, e.g.
-   `postgresql://postgres.<project-ref>:<password>@aws-0-<region>.pooler.supabase.com:6543/postgres`
+For Supabase, use **Project Settings -> Database -> Connection string** and copy
+the pooled connection string.
 
-No separate migrate step is needed: the API creates the full schema (`users`,
-`session`, `chats`, `messages`) automatically on the first request against an
-empty database (see `backend/src/db/schema.ts`). To pre-create it explicitly,
-run `POSTGRES_URL="<your-supabase-url>" npm run db:migrate --prefix backend`.
+No separate migrate step is required on Vercel. The API lazily creates the
+`memory_entries` table on first request via `backend/src/db/schema.ts`.
 
-> SSL is enabled automatically for `*.supabase.co` / `*.pooler.supabase.com` hosts.
-
-## 3. Environment variables
-
-In Vercel → **Settings** → **Environment Variables**:
+## 3. Environment Variables
 
 | Variable | Required | Notes |
-|----------|----------|--------|
-| `OPENAI_API_KEY` | Yes | [OpenAI API keys](https://platform.openai.com/api-keys) |
-| `POSTGRES_URL` | Yes | Supabase pooler connection string |
-| `SESSION_SECRET` | Yes | Long random string for session cookies |
-| `FRONTEND_URL` | Optional | Production URL, e.g. `https://pensieve.vercel.app` |
+| --- | --- | --- |
+| `OPENAI_API_KEY` | Yes | Used to generate one-sentence memory summaries. |
+| `POSTGRES_URL` | Yes | Managed Postgres connection string. |
+| `FRONTEND_URL` | Optional | Production URL, for CORS. |
+| `AI_SUMMARY_MODEL` | Optional | Defaults to `gpt-4o-mini`. |
 
-## 4. Redeploy
+## 4. Verify
 
-**Deployments** → latest → **Redeploy** (or push an empty commit).
+- `https://<your-domain>/api/health` returns `{"ok":true}`.
+- Create a memory in the app, then confirm it appears in the timeline.
 
-Build runs: backend compile → frontend build → copy to `public/`.
-The API creates the full database schema (`users`, `session`, `chats`, `messages`)
-on the first request, so builds do not need direct database access during `vercel build`.
+## Local Parity
 
-## 5. Verify
-
-- `https://<your-domain>/api/health` → `{"ok":true}`
-- Open the app, create a chat, send a message
-
-## Local parity
-
-```bash
-npm run setup          # Docker Postgres + migrate
-cp backend/.env.example backend/.env   # add OPENAI_API_KEY
-npm run dev:backend    # :3001
-npm run dev:frontend   # :5173
+```sh
+npm run setup
+cp backend/.env.example backend/.env
+npm run dev:backend
+npm run dev:frontend
 ```
-
-Optional: `npx vercel dev` at repo root (requires Vercel CLI + linked project).

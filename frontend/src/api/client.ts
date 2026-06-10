@@ -1,54 +1,43 @@
-import type { Chat, Message, User } from "../types";
+import type { MemoryEntry } from "../types";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`/api${path}`, {
-    credentials: "include",
     ...init,
     headers: {
       "Content-Type": "application/json",
       ...init?.headers,
     },
   });
+
   if (!res.ok) {
     const body = await res.json().catch(() => null);
     const message =
       typeof body?.error === "string" ? body.error : res.statusText || "Request failed";
     throw new Error(message);
   }
+
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
 }
 
 export const api = {
-  me: () => request<{ user: User | null }>("/auth/me"),
+  listMemoryEntries: () => request<MemoryEntry[]>("/memory-entries?limit=100"),
 
-  register: (email: string, password: string) =>
-    request<{ user: User }>("/auth/register", {
+  createMemoryEntry: (rawInput: string) =>
+    request<MemoryEntry>("/memory-entries", {
       method: "POST",
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ rawInput }),
     }),
 
-  login: (email: string, password: string) =>
-    request<{ user: User }>("/auth/login", {
-      method: "POST",
-      body: JSON.stringify({ email, password }),
+  getMemoryEntry: (id: string, signal?: AbortSignal) =>
+    request<MemoryEntry>(`/memory-entries/${id}`, { signal }),
+
+  updateMemoryEntry: (id: string, rawInput: string) =>
+    request<MemoryEntry>(`/memory-entries/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ rawInput }),
     }),
 
-  logout: () => request<void>("/auth/logout", { method: "POST" }),
-
-  listChats: () => request<Chat[]>("/chats?limit=50"),
-
-  createChat: () => request<Chat>("/chats", { method: "POST", body: JSON.stringify({}) }),
-
-  getMessages: (chatId: string, signal?: AbortSignal) =>
-    request<Message[]>(`/chats/${chatId}/messages`, { signal }),
-
-  deleteChat: (chatId: string) =>
-    request<void>(`/chats/${chatId}`, { method: "DELETE" }),
-
-  sendMessage: (chatId: string, content: string) =>
-    request<{ userMessage: Message; assistantMessage: Message; chat: Chat | null }>(
-      `/chats/${chatId}/messages`,
-      { method: "POST", body: JSON.stringify({ content }) }
-    ),
+  deleteMemoryEntry: (id: string) =>
+    request<void>(`/memory-entries/${id}`, { method: "DELETE" }),
 };
