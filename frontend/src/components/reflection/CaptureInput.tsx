@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef } from "react";
 interface CaptureInputProps {
   value: string;
   canSave: boolean;
+  saving: boolean;
   onChange: (value: string) => void;
   onSave: () => void;
 }
@@ -11,7 +12,7 @@ function wordCount(text: string) {
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
-export function CaptureInput({ value, canSave, onChange, onSave }: CaptureInputProps) {
+export function CaptureInput({ value, canSave, saving, onChange, onSave }: CaptureInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const words = useMemo(() => wordCount(value), [value]);
 
@@ -39,7 +40,7 @@ export function CaptureInput({ value, canSave, onChange, onSave }: CaptureInputP
           aria-label="What's on your mind?"
           onChange={(event) => onChange(event.target.value)}
           onKeyDown={(event) => {
-            if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+            if (!saving && (event.metaKey || event.ctrlKey) && event.key === "Enter") {
               event.preventDefault();
               onSave();
             }
@@ -57,7 +58,7 @@ export function CaptureInput({ value, canSave, onChange, onSave }: CaptureInputP
             aria-label="Quick capture"
             onChange={(event) => onChange(event.target.value)}
             onKeyDown={(event) => {
-              if (event.key === "Enter") {
+              if (!saving && event.key === "Enter") {
                 event.preventDefault();
                 onSave();
               }
@@ -78,8 +79,8 @@ export function CaptureInput({ value, canSave, onChange, onSave }: CaptureInputP
             <button
               className="icon-action icon-action--primary"
               type="button"
-              disabled={!canSave}
-              aria-label="Save memory"
+              disabled={!canSave || saving}
+              aria-label={saving ? "Saving memory" : "Save memory"}
               onClick={onSave}
             >
               <span
@@ -87,7 +88,7 @@ export function CaptureInput({ value, canSave, onChange, onSave }: CaptureInputP
                 aria-hidden="true"
                 style={{ fontVariationSettings: "'FILL' 1" }}
               >
-                add_circle
+                {saving ? "progress_activity" : "add_circle"}
               </span>
             </button>
           </div>
@@ -120,11 +121,11 @@ export function CaptureInput({ value, canSave, onChange, onSave }: CaptureInputP
             <button
               className="capture-dock__button"
               type="button"
-              disabled={!canSave}
-              aria-label="Save memory"
+              disabled={!canSave || saving}
+              aria-label={saving ? "Saving memory" : "Save memory"}
               onClick={onSave}
             >
-              Save Thought
+              {saving ? "Saving..." : "Save Thought"}
             </button>
           </div>
         </div>

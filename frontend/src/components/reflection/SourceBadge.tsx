@@ -6,14 +6,14 @@ interface SourceBadgeProps {
 }
 
 const icons: Record<MemorySourceType, string> = {
-  text: "chat",
+  text: "edit_note",
   screenshot: "screenshot_monitor",
   photo: "image",
   voice: "mic",
 };
 
 const labels: Record<MemorySourceType, string> = {
-  text: "From chat",
+  text: "Text",
   screenshot: "From screenshot",
   photo: "From photo",
   voice: "Voice note",

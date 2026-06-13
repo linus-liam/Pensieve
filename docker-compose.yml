@@ -17,9 +17,17 @@ services:
       retries: 10
 
   migrate:
+    profiles: ["app"]
     build:
       context: ./backend
       dockerfile: Dockerfile.dev
+    env_file:
+      - path: ./.env
+        required: false
+      - path: ./.env.local
+        required: false
+      - path: ./backend/.env
+        required: false
     command: sh -c "npm ci && npm run db:migrate"
     environment:
       DB_HOST: postgres
@@ -36,9 +44,17 @@ services:
     restart: "no"
 
   backend:
+    profiles: ["app"]
     build:
       context: ./backend
       dockerfile: Dockerfile.dev
+    env_file:
+      - path: ./.env
+        required: false
+      - path: ./.env.local
+        required: false
+      - path: ./backend/.env
+        required: false
     command: sh -c "npm ci && npm run dev"
     environment:
       DB_HOST: postgres
@@ -47,10 +63,9 @@ services:
       DB_USER: pensieve
       DB_PASSWORD: pensieve
       PORT: 3001
-      FRONTEND_URL: http://localhost:5173
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-    ports:
-      - "3001:3001"
+      FRONTEND_URL: http://localhost:5174
+    expose:
+      - "3001"
     volumes:
       - ./backend:/app
       - /app/node_modules
@@ -61,6 +76,7 @@ services:
         condition: service_completed_successfully
 
   frontend:
+    profiles: ["app"]
     build:
       context: ./frontend
       dockerfile: Dockerfile.dev

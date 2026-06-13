@@ -3,6 +3,7 @@ import { TimelineCard } from "./TimelineCard";
 
 interface TimelineProps {
   memories: Memory[];
+  onOpenMemory: (memory: Memory) => void;
 }
 
 const dayOrder = ["Today", "Yesterday"];
@@ -24,7 +25,7 @@ function groupMemories(memories: Memory[]) {
   });
 }
 
-export function Timeline({ memories }: TimelineProps) {
+export function Timeline({ memories, onOpenMemory }: TimelineProps) {
   const groups = groupMemories(memories);
 
   return (
@@ -35,7 +36,12 @@ export function Timeline({ memories }: TimelineProps) {
             <h2 id={`timeline-${day}`}>{day}</h2>
             <div className="timeline-stack">
               {dayMemories.map((memory) => (
-                <TimelineCard key={memory.id} memory={memory} muted={day !== "Today"} />
+                <TimelineCard
+                  key={memory.id}
+                  memory={memory}
+                  muted={day !== "Today"}
+                  onOpen={() => onOpenMemory(memory)}
+                />
               ))}
             </div>
           </section>

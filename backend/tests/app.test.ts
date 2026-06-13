@@ -8,8 +8,7 @@ const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 const runDbTests = testDatabaseUrl ? describe : describe.skip;
 
 const aiMocks = vi.hoisted(() => ({
-  getAIReply: vi.fn(),
-  generateTitle: vi.fn(),
+  summarizeMemory: vi.fn(),
 }));
 
 vi.mock("../src/services/aiService.js", () => aiMocks);
@@ -17,10 +16,9 @@ vi.mock("../src/services/aiService.js", () => aiMocks);
 if (testDatabaseUrl) {
   process.env.DATABASE_URL = testDatabaseUrl;
   process.env.NODE_ENV = "test";
-  process.env.SESSION_SECRET = "test-session-secret";
 }
 
-runDbTests("app", () => {
+runDbTests("memory entries API", () => {
   let app: Express;
   let pool: typeof import("../src/db/client.js")["pool"];
 
@@ -37,80 +35,101 @@ runDbTests("app", () => {
   });
 
   beforeEach(async () => {
-    aiMocks.getAIReply.mockReset();
-    aiMocks.generateTitle.mockReset();
-    await pool.query('TRUNCATE messages, chats, "session", users RESTART IDENTITY CASCADE');
+    aiMocks.summarizeMemory.mockReset();
+    await pool.query("TRUNCATE memory_entries RESTART IDENTITY CASCADE");
   });
 
   afterAll(async () => {
     await pool.end();
   });
 
-  async function register(email: string) {
-    const agent = request.agent(app);
-    const response = await agent
-      .post("/api/auth/register")
-      .send({ email, password: "correct horse battery staple" })
+  it("saves raw input and AI summary", async () => {
+    aiMocks.summarizeMemory.mockResolvedValue("A one sentence memory summary.");
+
+    const response = await request(app)
+      .post("/api/memory-entries")
+      .send({ rawInput: "I felt calmer after writing the plan down." })
       .expect(201);
 
-    expect(response.body.user.email).toBe(email);
-    return agent;
-  }
-
-  it("requires authentication for chats", async () => {
-    await request(app).get("/api/chats").expect(401);
+    expect(response.body.raw_input).toBe("I felt calmer after writing the plan down.");
+    expect(response.body.ai_summary).toBe("A one sentence memory summary.");
+    expect(response.body.created_at).toBeTruthy();
+    expect(response.body.updated_at).toBeTruthy();
   });
 
-  it("prevents reading another user's chat", async () => {
-    const firstUser = await register("one@example.com");
-    const secondUser = await register("two@example.com");
+  it("lists memories newest first", async () => {
+    aiMocks.summarizeMemory
+      .mockResolvedValueOnce("First summary.")
+      .mockResolvedValueOnce("Second summary.");
 
-    const chat = await firstUser.post("/api/chats").send({}).expect(201);
-
-    await secondUser.get(`/api/chats/${chat.body.id}/messages`).expect(404);
-  });
-
-  it("stores one complete turn and deterministic title on AI success", async () => {
-    aiMocks.getAIReply.mockResolvedValue("A short reply.");
-    aiMocks.generateTitle.mockResolvedValue("A Useful Title");
-
-    const agent = await register("writer@example.com");
-    const chat = await agent.post("/api/chats").send({}).expect(201);
-
-    const sent = await agent
-      .post(`/api/chats/${chat.body.id}/messages`)
-      .send({ content: "I feel overwhelmed today." })
+    const first = await request(app)
+      .post("/api/memory-entries")
+      .send({ rawInput: "First memory" })
+      .expect(201);
+    const second = await request(app)
+      .post("/api/memory-entries")
+      .send({ rawInput: "Second memory" })
       .expect(201);
 
-    expect(sent.body.userMessage.content).toBe("I feel overwhelmed today.");
-    expect(sent.body.assistantMessage.content).toBe("A short reply.");
-    expect(sent.body.chat.title).toBe("A Useful Title");
+    const list = await request(app).get("/api/memory-entries").expect(200);
 
-    const messages = await agent.get(`/api/chats/${chat.body.id}/messages`).expect(200);
-    expect(messages.body).toHaveLength(2);
+    expect(list.body.map((entry: { id: string }) => entry.id)).toEqual([
+      second.body.id,
+      first.body.id,
+    ]);
   });
 
-  it("does not persist a partial user message when AI fails", async () => {
-    aiMocks.getAIReply.mockRejectedValue(
+  it("opens detail, edits, and deletes a memory", async () => {
+    aiMocks.summarizeMemory
+      .mockResolvedValueOnce("Original summary.")
+      .mockResolvedValueOnce("Updated summary.");
+
+    const created = await request(app)
+      .post("/api/memory-entries")
+      .send({ rawInput: "Original memory" })
+      .expect(201);
+
+    const detail = await request(app)
+      .get(`/api/memory-entries/${created.body.id}`)
+      .expect(200);
+    expect(detail.body.ai_summary).toBe("Original summary.");
+
+    const updated = await request(app)
+      .patch(`/api/memory-entries/${created.body.id}`)
+      .send({ rawInput: "Updated memory" })
+      .expect(200);
+    expect(updated.body.raw_input).toBe("Updated memory");
+    expect(updated.body.ai_summary).toBe("Updated summary.");
+
+    await request(app).delete(`/api/memory-entries/${created.body.id}`).expect(204);
+    await request(app).get(`/api/memory-entries/${created.body.id}`).expect(404);
+  });
+
+  it("does not persist a partial entry when AI summary fails", async () => {
+    aiMocks.summarizeMemory.mockRejectedValue(
       new AppError(503, "AI provider unavailable", "ai_unavailable")
     );
 
-    const agent = await register("failure@example.com");
-    const chat = await agent.post("/api/chats").send({}).expect(201);
-
-    await agent
-      .post(`/api/chats/${chat.body.id}/messages`)
-      .send({ content: "Please help." })
+    await request(app)
+      .post("/api/memory-entries")
+      .send({ rawInput: "Please summarize later." })
       .expect(503);
 
-    const messages = await agent.get(`/api/chats/${chat.body.id}/messages`).expect(200);
-    expect(messages.body).toHaveLength(0);
+    const list = await request(app).get("/api/memory-entries").expect(200);
+    expect(list.body).toHaveLength(0);
   });
 
-  it("returns clean 400 JSON for invalid chat ids", async () => {
-    const agent = await register("invalid@example.com");
+  it("rejects oversized memory input before calling AI", async () => {
+    await request(app)
+      .post("/api/memory-entries")
+      .send({ rawInput: "x".repeat(2001) })
+      .expect(413);
 
-    const response = await agent.get("/api/chats/not-a-uuid/messages").expect(400);
+    expect(aiMocks.summarizeMemory).not.toHaveBeenCalled();
+  });
+
+  it("returns clean 400 JSON for invalid ids", async () => {
+    const response = await request(app).get("/api/memory-entries/not-a-uuid").expect(400);
     expect(response.body.code).toBe("invalid_uuid");
   });
 });

@@ -520,6 +520,13 @@ button:disabled {
   transition: box-shadow 300ms var(--spring), transform 300ms var(--spring);
 }
 
+.memory-card--button {
+  display: block;
+  width: 100%;
+  color: inherit;
+  text-align: left;
+}
+
 .memory-card:hover {
   box-shadow: var(--shadow-card-hover);
   transform: translateY(-2px);
@@ -612,6 +619,110 @@ button:disabled {
   max-width: 200px;
   font-size: 16px;
   line-height: 1.6;
+}
+
+.inline-error {
+  width: min(100%, var(--content-max));
+  margin: var(--stack-md) auto 0;
+  color: var(--error);
+  font-size: 14px;
+}
+
+.empty-state {
+  padding: var(--stack-lg) 0;
+  color: var(--on-surface-variant);
+  text-align: center;
+}
+
+/* ── Detail page ── */
+
+.detail-page {
+  width: min(100%, var(--content-max));
+  margin: 0 auto;
+  padding: var(--stack-md) var(--container-padding-mobile) var(--stack-lg);
+}
+
+.detail-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--stack-md);
+  padding: 32px;
+  border: 1px solid rgba(227, 226, 224, 0.5);
+  border-radius: 12px;
+  background: var(--surface-container-lowest);
+  box-shadow: var(--shadow-card);
+}
+
+.detail-panel__meta {
+  color: var(--secondary);
+  font-size: 13px;
+}
+
+.detail-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.detail-section h2 {
+  color: var(--primary);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.detail-section p {
+  color: var(--on-surface);
+  font-family: var(--font-display);
+  font-size: 22px;
+  line-height: 1.45;
+}
+
+.detail-textarea {
+  width: 100%;
+  min-height: 220px;
+  padding: 16px;
+  resize: vertical;
+  border: 1px solid var(--outline-variant);
+  border-radius: 8px;
+  background: var(--surface-container-lowest);
+  color: var(--on-surface);
+  line-height: 1.6;
+  outline: 0;
+}
+
+.detail-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.detail-button {
+  min-height: 42px;
+  padding: 0 18px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 500;
+  transition: opacity 200ms var(--spring), transform 200ms var(--spring);
+}
+
+.detail-button:hover:not(:disabled) {
+  opacity: 0.88;
+}
+
+.detail-button:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.detail-button--primary {
+  background: var(--primary);
+  color: var(--on-primary);
+}
+
+.detail-button--danger {
+  background: rgba(186, 26, 26, 0.08);
+  color: var(--error);
 }
 
 /* ── Animations ── */
@@ -876,6 +987,10 @@ button:disabled {
   }
 
   .timeline-page {
+    padding: 128px var(--container-padding-desktop) var(--stack-lg);
+  }
+
+  .detail-page {
     padding: 128px var(--container-padding-desktop) var(--stack-lg);
   }
 
