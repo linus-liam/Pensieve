@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "./api/client";
-import { CaptureInput } from "./components/reflection/CaptureInput";
+import { CaptureComposer } from "./components/reflection/CaptureComposer";
+import { CaptureDisplay } from "./components/reflection/CaptureDisplay";
 import { SaveConfirmation } from "./components/reflection/SaveConfirmation";
 import { SideNav } from "./components/reflection/SideNav";
 import { Timeline } from "./components/reflection/Timeline";
@@ -201,15 +202,16 @@ export function App() {
             </header>
 
             <main className="capture-page">
-              <CaptureInput
-                value={draft}
-                onChange={setDraft}
-                onSave={saveMemory}
-                canSave={canSave}
-                saving={saving}
-              />
+              <CaptureDisplay />
               {error ? <p className="inline-error" role="alert">{error}</p> : null}
             </main>
+
+            <CaptureComposer
+              value={draft}
+              onChange={setDraft}
+              onSave={saveMemory}
+              canSave={canSave}
+            />
           </>
         ) : page === "memories" ? (
           <>

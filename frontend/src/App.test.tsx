@@ -35,14 +35,17 @@ describe("App memory flow", () => {
     vi.restoreAllMocks();
   });
 
-  it("opens on the capture page", async () => {
+  it("opens on the capture page with display-only body and a single composer input", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse([])));
 
     render(<App />);
 
     expect(screen.getByRole("button", { name: "Pensieve" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "What do you want to put down?" })).toBeInTheDocument();
     expect(screen.getByLabelText("What's on your mind?")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Open memories" })).toBeInTheDocument();
+    expect(screen.getAllByRole("textbox")).toHaveLength(1);
+    expect(screen.queryByRole("textbox", { name: /put down/i })).not.toBeInTheDocument();
     await waitFor(() => expect(fetch).toHaveBeenCalledWith("/api/memory-entries?limit=100", expect.any(Object)));
   });
 
@@ -99,5 +102,33 @@ describe("App memory flow", () => {
 
     await user.click(screen.getByRole("button", { name: "Delete" }));
     expect(await screen.findByText("No memories saved yet.")).toBeInTheDocument();
+  });
+
+  it("submits on Enter from the composer input", async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn()
+        .mockResolvedValueOnce(jsonResponse([]))
+        .mockResolvedValueOnce(jsonResponse(firstEntry, { status: 201 }))
+    );
+
+    render(<App />);
+
+    await user.type(screen.getByLabelText("What's on your mind?"), "A quiet thought{Enter}");
+
+    expect(await screen.findByText("Saved to your memories")).toBeInTheDocument();
+  });
+
+  it("updates the word count in the composer", async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse([])));
+
+    render(<App />);
+
+    expect(screen.getByText("0 words")).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText("What's on your mind?"), "one two three");
+    expect(screen.getByText("3 words")).toBeInTheDocument();
   });
 });
