@@ -24,8 +24,9 @@ serves the timeline/detail flow.
    The URL is `https://<project-ref>.supabase.co`; the anon key is under
    Supabase Project Settings -> API.
 
-4. In Supabase Auth, enable the Google provider and add
-   `http://localhost:5173` as an allowed redirect URL.
+4. In Supabase Auth, keep the Email provider enabled and add
+   `http://localhost:5173` as an allowed redirect URL. For production email
+   delivery, configure the Send Email Auth Hook in `supabase/README.md`.
 
 5. Start Postgres and run migrations:
 
