@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
@@ -64,6 +64,14 @@ function renderApp() {
   );
 }
 
+async function findMainNavigation() {
+  return screen.findByRole("navigation", { name: "Main navigation" });
+}
+
+async function findPrimaryNavigation() {
+  return screen.findByRole("navigation", { name: "Primary navigation" });
+}
+
 const testSession = {
   access_token: "test-access-token",
   user: {
@@ -106,7 +114,9 @@ describe("App memory flow", () => {
     renderApp();
 
     expect(screen.queryByRole("banner")).not.toBeInTheDocument();
-    expect(await screen.findByRole("button", { name: "Capture" })).toBeInTheDocument();
+    expect(
+      within(await findMainNavigation()).getByRole("button", { name: "Capture" })
+    ).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Capture" })).toBeInTheDocument();
     expect(screen.getByText("I'm here. What feels worth remembering right now?")).toBeInTheDocument();
     expect(screen.getByLabelText("Message to save as a memory")).toBeInTheDocument();
@@ -132,8 +142,53 @@ describe("App memory flow", () => {
     expect(screen.getByRole("heading", { name: "Capture" })).toBeInTheDocument();
     expect(await screen.findByText(capturedFirstEntry.acknowledgement)).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Memories" }));
+    await user.click(
+      within(await findMainNavigation()).getByRole("button", { name: "Memories" })
+    );
     expect(await screen.findByText(firstEntry.ai_summary)).toBeInTheDocument();
+  });
+
+  it("renders mobile bottom primary navigation instead of a segmented switcher", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse([])));
+
+    renderApp();
+
+    const primaryNavigation = await findPrimaryNavigation();
+
+    expect(primaryNavigation).toBeInTheDocument();
+    expect(
+      screen.queryByRole("radiogroup", { name: "Mobile navigation" })
+    ).not.toBeInTheDocument();
+    expect(
+      within(primaryNavigation).getByRole("button", { name: "Capture" })
+    ).toHaveAttribute("aria-current", "page");
+    expect(
+      within(primaryNavigation).getByRole("button", { name: "Memories" })
+    ).not.toHaveAttribute("aria-current");
+  });
+
+  it("keeps Memories active on detail and returns to the memories page from Back", async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse([firstEntry])));
+
+    renderApp();
+
+    await user.click(
+      within(await findPrimaryNavigation()).getByRole("button", { name: "Memories" })
+    );
+    await user.click(await screen.findByRole("link", { name: /Open memory: Writing the plan down/ }));
+
+    const primaryNavigation = await findPrimaryNavigation();
+
+    expect(
+      within(primaryNavigation).getByRole("button", { name: "Memories" })
+    ).toHaveAttribute("aria-current", "page");
+    expect(window.location.hash).toBe(`#memory/${encodeURIComponent(firstEntry.id)}`);
+
+    await user.click(screen.getByRole("button", { name: "Back" }));
+
+    expect(await screen.findByRole("heading", { name: "Memories" })).toBeInTheDocument();
+    expect(window.location.hash).toBe("#memories");
   });
 
   it("opens detail, edits, and confirms before deleting a memory", async () => {
@@ -157,7 +212,9 @@ describe("App memory flow", () => {
 
     renderApp();
 
-    await user.click(await screen.findByRole("button", { name: "Memories" }));
+    await user.click(
+      within(await findMainNavigation()).getByRole("button", { name: "Memories" })
+    );
     await user.click(await screen.findByRole("link", { name: /Open memory: Writing the plan down/ }));
 
     expect(screen.getByText("Summary")).toBeInTheDocument();
@@ -213,12 +270,16 @@ describe("App memory flow", () => {
 
     renderApp();
 
-    await screen.findByRole("button", { name: "Capture" });
+    expect(
+      within(await findMainNavigation()).getByRole("button", { name: "Capture" })
+    ).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Attach photo/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Record voice note/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Add mood/ })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Memories" }));
+    await user.click(
+      within(await findMainNavigation()).getByRole("button", { name: "Memories" })
+    );
 
     expect(screen.queryByRole("button", { name: /Settings/ })).not.toBeInTheDocument();
   });

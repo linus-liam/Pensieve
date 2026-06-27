@@ -7,7 +7,6 @@ import {
   Group,
   Loader,
   MantineProvider,
-  SegmentedControl,
   Text,
   Stack,
   Title,
@@ -20,6 +19,7 @@ import {
   type CaptureChatMessage,
 } from "./components/reflection/CaptureComposer";
 import { MemoryDetail } from "./components/reflection/MemoryDetail";
+import { MobileBottomNav } from "./components/reflection/MobileBottomNav";
 import { SideNav } from "./components/reflection/SideNav";
 import { Timeline } from "./components/reflection/Timeline";
 import type { Memory, MemoryEntry } from "./types";
@@ -118,26 +118,8 @@ function getHashForRoute(page: Page, selectedId: string | null) {
   return "#capture";
 }
 
-interface MobileRouteSwitcherProps {
-  page: Page;
-  onNavigate: (page: NavPage) => void;
-}
-
-function MobileRouteSwitcher({ page, onNavigate }: MobileRouteSwitcherProps) {
-  return (
-    <SegmentedControl
-      aria-label="Mobile navigation"
-      className="mobile-route-switcher"
-      data={[
-        { label: "Capture", value: "capture" },
-        { label: "Memories", value: "memories" },
-      ]}
-      fullWidth
-      radius="sm"
-      value={page === "capture" ? "capture" : "memories"}
-      onChange={(value) => onNavigate(value as NavPage)}
-    />
-  );
+function getActiveNavPage(page: Page): NavPage {
+  return page === "capture" ? "capture" : "memories";
 }
 
 function AuthenticatedApp() {
@@ -180,6 +162,7 @@ function AuthenticatedApp() {
   const selectedMemory = selectedEntry ? toMemory(selectedEntry) : null;
   const canSave = draft.trim().length > 0;
   const canUpdate = detailDraft.trim().length > 0 && detailDraft.trim() !== selectedEntry?.raw_input;
+  const activeNavPage = getActiveNavPage(page);
 
   const applyRoute = useCallback((route: RouteState) => {
     setPage(route.page);
@@ -339,7 +322,7 @@ function AuthenticatedApp() {
       >
         <AppShell.Navbar p="md">
           <SideNav
-            page={page === "detail" ? "memories" : page}
+            page={activeNavPage}
             signingOut={signingOut}
             userEmail={user?.email ?? null}
             onNavigate={navigateFromNav}
@@ -347,7 +330,7 @@ function AuthenticatedApp() {
           />
         </AppShell.Navbar>
 
-        <AppShell.Main>
+        <AppShell.Main className="app-content">
           <Container py="lg" size="sm">
             <Stack gap="md">
               <Group className="account-bar" gap="sm" justify="space-between" wrap="nowrap">
@@ -364,8 +347,6 @@ function AuthenticatedApp() {
                   Sign out
                 </Button>
               </Group>
-
-              <MobileRouteSwitcher page={page} onNavigate={navigateFromNav} />
 
               {page === "capture" ? (
                 <Stack gap="lg">
@@ -428,7 +409,7 @@ function AuthenticatedApp() {
                     w="fit-content"
                     onClick={() => navigate("memories")}
                   >
-                    Back to memories
+                    Back
                   </Button>
                   <Group gap="xs">
                     <Loader size="sm" />
@@ -446,7 +427,7 @@ function AuthenticatedApp() {
                     w="fit-content"
                     onClick={() => navigate("memories")}
                   >
-                    Back to memories
+                    Back
                   </Button>
                   <Title order={2} size="h2">
                     Memory detail
@@ -466,6 +447,8 @@ function AuthenticatedApp() {
             </Stack>
           </Container>
         </AppShell.Main>
+
+        <MobileBottomNav activePage={activeNavPage} onNavigate={navigateFromNav} />
       </AppShell>
     </>
   );

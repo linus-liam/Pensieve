@@ -1,4 +1,5 @@
 import { Button, NavLink, Stack, Text, Title } from "@mantine/core";
+import { BookOpen, PenLine } from "lucide-react";
 
 type Page = "capture" | "memories";
 
@@ -32,15 +33,19 @@ export function SideNav({
         <Stack gap="xs">
           <NavLink
             active={page === "capture"}
+            aria-current={page === "capture" ? "page" : undefined}
             component="button"
             label="Capture"
+            leftSection={<PenLine aria-hidden="true" size={16} strokeWidth={1.9} />}
             variant="light"
             onClick={() => onNavigate("capture")}
           />
           <NavLink
             active={page === "memories"}
+            aria-current={page === "memories" ? "page" : undefined}
             component="button"
             label="Memories"
+            leftSection={<BookOpen aria-hidden="true" size={16} strokeWidth={1.9} />}
             variant="light"
             onClick={() => onNavigate("memories")}
           />
