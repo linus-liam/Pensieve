@@ -3,7 +3,6 @@ import cors from "cors";
 import express from "express";
 import helmet from "helmet";
 import memoryEntriesRouter from "./routes/memoryEntries.js";
-import { ensureSchema } from "./db/ensureSchema.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { apiRateLimit } from "./middleware/rateLimit.js";
 import { requireAuth } from "./middleware/requireAuth.js";
@@ -11,6 +10,11 @@ import { requireAuth } from "./middleware/requireAuth.js";
 const corsOrigin =
   process.env.FRONTEND_URL ??
   (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:5173");
+
+async function ensureDbSchema() {
+  const { ensureSchema } = await import("./db/ensureSchema.js");
+  return ensureSchema();
+}
 
 export function createApp() {
   const app = express();
@@ -30,7 +34,7 @@ export function createApp() {
 
     // Serverless (Vercel) has no migrate step; lazily ensure the schema exists.
     app.use(prefix, (_req, _res, next) => {
-      ensureSchema().then(() => next(), next);
+      ensureDbSchema().then(() => next(), next);
     });
 
     app.use(prefix, apiRateLimit);
