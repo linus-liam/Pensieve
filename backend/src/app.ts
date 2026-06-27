@@ -44,6 +44,6 @@ export function createApp() {
   return app;
 }
 
-// Default instance for the Vercel serverless entry (api/index.ts).
+// Default app export for Vercel and test/runtime adapters.
 const app = createApp();
 export default app;
