@@ -1,15 +1,16 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   AppShell,
-  Box,
   Button,
   Container,
   Group,
   Loader,
   MantineProvider,
-  Stack,
+  SegmentedControl,
   Text,
+  Stack,
+  Title,
 } from "@mantine/core";
 import { api } from "./api/client";
 import { CaptureComposer } from "./components/reflection/CaptureComposer";
@@ -18,10 +19,15 @@ import { MemoryDetail } from "./components/reflection/MemoryDetail";
 import { SaveConfirmation } from "./components/reflection/SaveConfirmation";
 import { SideNav } from "./components/reflection/SideNav";
 import { Timeline } from "./components/reflection/Timeline";
-import { UnavailableIconButton } from "./components/reflection/UnavailableIconButton";
 import type { Memory, MemoryEntry } from "./types";
 
 type Page = "capture" | "memories" | "detail";
+type NavPage = "capture" | "memories";
+
+interface RouteState {
+  page: Page;
+  selectedId: string | null;
+}
 
 function formatTime(value: string) {
   return new Intl.DateTimeFormat("en-US", {
@@ -75,83 +81,63 @@ function toMemory(entry: MemoryEntry): Memory {
   };
 }
 
-interface AppHeaderProps {
+function getRouteFromHash(): RouteState {
+  if (typeof window === "undefined") return { page: "capture", selectedId: null };
+
+  const hash = window.location.hash.replace(/^#\/?/, "");
+
+  if (hash === "memories") return { page: "memories", selectedId: null };
+  if (hash.startsWith("memory/")) {
+    const id = hash.slice("memory/".length);
+    return id
+      ? { page: "detail", selectedId: decodeURIComponent(id) }
+      : { page: "memories", selectedId: null };
+  }
+
+  return { page: "capture", selectedId: null };
+}
+
+function getHashForRoute(page: Page, selectedId: string | null) {
+  if (page === "memories") return "#memories";
+  if (page === "detail" && selectedId) return `#memory/${encodeURIComponent(selectedId)}`;
+  return "#capture";
+}
+
+interface MobileRouteSwitcherProps {
   page: Page;
-  onNavigate: (page: Page) => void;
-  onRefresh: () => void;
+  onNavigate: (page: NavPage) => void;
 }
 
-function getHeaderTitle(page: Page) {
-  if (page === "capture") return "New Entry";
-  if (page === "memories") return "Memories";
-  return "Detail";
-}
-
-function AppHeader({ page, onNavigate, onRefresh }: AppHeaderProps) {
-  const backTarget = page === "detail" ? "memories" : "capture";
-  const backLabel = page === "detail" ? "Back to memories" : "Back to capture";
-
+function MobileRouteSwitcher({ page, onNavigate }: MobileRouteSwitcherProps) {
   return (
-    <AppShell.Header>
-      <Group h="100%" gap="sm" px="md" wrap="nowrap">
-        {page !== "capture" ? (
-          <Button
-            aria-label={backLabel}
-            radius="sm"
-            size="xs"
-            variant="subtle"
-            onClick={() => onNavigate(backTarget)}
-          >
-            Back
-          </Button>
-        ) : null}
-
-        <Button radius="sm" variant="subtle" onClick={() => onNavigate("capture")}>
-          Pensieve
-        </Button>
-
-        <Text fw={600} size="sm">
-          {getHeaderTitle(page)}
-        </Text>
-
-        <Box style={{ flex: 1 }} />
-
-        {page === "capture" ? (
-          <Button
-            aria-label="Open memories"
-            radius="sm"
-            size="xs"
-            variant="default"
-            onClick={() => onNavigate("memories")}
-          >
-            Memories
-          </Button>
-        ) : null}
-
-        {page === "memories" ? (
-          <Group gap="xs" wrap="nowrap">
-            <Button radius="sm" size="xs" variant="default" onClick={onRefresh}>
-              Refresh
-            </Button>
-            <UnavailableIconButton label="Settings" icon="settings" />
-          </Group>
-        ) : null}
-      </Group>
-    </AppShell.Header>
+    <SegmentedControl
+      aria-label="Mobile navigation"
+      className="mobile-route-switcher"
+      data={[
+        { label: "Capture", value: "capture" },
+        { label: "Memories", value: "memories" },
+      ]}
+      fullWidth
+      radius="sm"
+      value={page === "capture" ? "capture" : "memories"}
+      onChange={(value) => onNavigate(value as NavPage)}
+    />
   );
 }
 
 export function App() {
-  const [page, setPage] = useState<Page>("capture");
+  const initialRoute = useMemo(getRouteFromHash, []);
+  const [page, setPage] = useState<Page>(initialRoute.page);
   const [draft, setDraft] = useState("");
   const [entries, setEntries] = useState<MemoryEntry[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(initialRoute.selectedId);
   const [detailDraft, setDetailDraft] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const hydratedDetailId = useRef<string | null>(null);
 
   const loadEntries = useCallback(async () => {
     setLoading(true);
@@ -177,13 +163,66 @@ export function App() {
   const canSave = draft.trim().length > 0;
   const canUpdate = detailDraft.trim().length > 0 && detailDraft.trim() !== selectedEntry?.raw_input;
 
-  const navigate = useCallback((nextPage: Page) => {
-    if (nextPage !== "detail") {
+  const applyRoute = useCallback((route: RouteState) => {
+    setPage(route.page);
+    setSelectedId(route.selectedId);
+
+    if (route.page !== "detail") {
       setSelectedId(null);
       setDetailDraft("");
+      hydratedDetailId.current = null;
+    } else {
+      hydratedDetailId.current = null;
     }
-    setPage(nextPage);
   }, []);
+
+  useEffect(() => {
+    const handleRouteChange = () => applyRoute(getRouteFromHash());
+
+    window.addEventListener("hashchange", handleRouteChange);
+    window.addEventListener("popstate", handleRouteChange);
+
+    return () => {
+      window.removeEventListener("hashchange", handleRouteChange);
+      window.removeEventListener("popstate", handleRouteChange);
+    };
+  }, [applyRoute]);
+
+  useEffect(() => {
+    if (page !== "detail" || !selectedEntry) return;
+    if (hydratedDetailId.current === selectedEntry.id) return;
+
+    setDetailDraft(selectedEntry.raw_input);
+    hydratedDetailId.current = selectedEntry.id;
+  }, [page, selectedEntry]);
+
+  const navigate = useCallback(
+    (nextPage: Page, memoryId?: string) => {
+      const nextSelectedId = nextPage === "detail" ? memoryId ?? selectedId : null;
+      if (nextPage === "detail" && !nextSelectedId) return;
+
+      setPage(nextPage);
+      setSelectedId(nextSelectedId);
+
+      if (nextPage !== "detail") {
+        setDetailDraft("");
+        hydratedDetailId.current = null;
+      }
+
+      const nextHash = getHashForRoute(nextPage, nextSelectedId);
+      if (window.location.hash !== nextHash) {
+        window.location.hash = nextHash;
+      }
+    },
+    [selectedId]
+  );
+
+  const navigateFromNav = useCallback(
+    (nextPage: NavPage) => {
+      navigate(nextPage);
+    },
+    [navigate]
+  );
 
   const saveMemory = useCallback(async () => {
     const rawInput = draft.trim();
@@ -197,7 +236,6 @@ export function App() {
       setEntries((current) => [entry, ...current]);
       setDraft("");
       setShowConfirmation(true);
-      setPage("memories");
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "Could not save memory");
     } finally {
@@ -208,8 +246,9 @@ export function App() {
   const openMemory = useCallback((memory: Memory) => {
     setSelectedId(memory.id);
     setDetailDraft(memory.rawInput);
-    setPage("detail");
-  }, []);
+    hydratedDetailId.current = memory.id;
+    navigate("detail", memory.id);
+  }, [navigate]);
 
   const updateMemory = useCallback(async () => {
     if (!selectedEntry || !canUpdate || updating) return;
@@ -223,6 +262,7 @@ export function App() {
         current.map((entry) => (entry.id === updated.id ? updated : entry))
       );
       setDetailDraft(updated.raw_input);
+      hydratedDetailId.current = updated.id;
     } catch (updateError) {
       setError(updateError instanceof Error ? updateError.message : "Could not update memory");
     } finally {
@@ -239,33 +279,30 @@ export function App() {
     try {
       await api.deleteMemoryEntry(selectedEntry.id);
       setEntries((current) => current.filter((entry) => entry.id !== selectedEntry.id));
-      setSelectedId(null);
-      setDetailDraft("");
-      setPage("memories");
+      navigate("memories");
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : "Could not delete memory");
     } finally {
       setUpdating(false);
     }
-  }, [selectedEntry, updating]);
+  }, [navigate, selectedEntry, updating]);
 
   return (
     <MantineProvider defaultColorScheme="light">
       <AppShell
-        header={{ height: 64 }}
         navbar={{ width: 240, breakpoint: "sm", collapsed: { mobile: true } }}
         padding="md"
       >
-        <AppHeader page={page} onNavigate={navigate} onRefresh={loadEntries} />
-
         <AppShell.Navbar p="md">
-          <SideNav page={page === "detail" ? "memories" : page} onNavigate={navigate} />
+          <SideNav page={page === "detail" ? "memories" : page} onNavigate={navigateFromNav} />
         </AppShell.Navbar>
 
         <AppShell.Main>
           <Container py="lg" size="sm">
+            <MobileRouteSwitcher page={page} onNavigate={navigateFromNav} />
+
             {page === "capture" ? (
-              <Stack gap="lg">
+              <Stack gap="lg" mt={{ base: "md", sm: 0 }}>
                 <CaptureDisplay />
                 {error ? (
                   <Alert color="red" role="alert" title="Something went wrong">
@@ -274,6 +311,7 @@ export function App() {
                 ) : null}
                 <CaptureComposer
                   canSave={canSave}
+                  saving={saving}
                   value={draft}
                   onChange={setDraft}
                   onSave={saveMemory}
@@ -282,7 +320,16 @@ export function App() {
             ) : null}
 
             {page === "memories" ? (
-              <Stack gap="md">
+              <Stack gap="md" mt={{ base: "md", sm: 0 }}>
+                <Group justify="space-between" wrap="nowrap">
+                  <Title order={2} size="h2">
+                    Memories
+                  </Title>
+                  <Button radius="sm" size="xs" variant="default" onClick={loadEntries}>
+                    Refresh
+                  </Button>
+                </Group>
+
                 {error ? (
                   <Alert color="red" role="alert" title="Something went wrong">
                     {error}
@@ -306,17 +353,49 @@ export function App() {
               </Stack>
             ) : null}
 
-            {page === "detail" ? (
-              <MemoryDetail
-                canUpdate={canUpdate}
-                error={error}
-                memory={selectedMemory}
-                updating={updating}
-                value={detailDraft}
-                onChange={setDetailDraft}
-                onDelete={deleteMemory}
-                onUpdate={updateMemory}
-              />
+            {page === "detail" && loading && !selectedMemory ? (
+              <Stack gap="md" mt={{ base: "md", sm: 0 }}>
+                <Button
+                  radius="sm"
+                  size="xs"
+                  variant="subtle"
+                  w="fit-content"
+                  onClick={() => navigate("memories")}
+                >
+                  Back to memories
+                </Button>
+                <Group gap="xs">
+                  <Loader size="sm" />
+                  <Text c="dimmed">Loading memory...</Text>
+                </Group>
+              </Stack>
+            ) : null}
+
+            {page === "detail" && (!loading || selectedMemory) ? (
+              <Stack gap="md" mt={{ base: "md", sm: 0 }}>
+                <Button
+                  radius="sm"
+                  size="xs"
+                  variant="subtle"
+                  w="fit-content"
+                  onClick={() => navigate("memories")}
+                >
+                  Back to memories
+                </Button>
+                <Title order={2} size="h2">
+                  Memory detail
+                </Title>
+                <MemoryDetail
+                  canUpdate={canUpdate}
+                  error={error}
+                  memory={selectedMemory}
+                  updating={updating}
+                  value={detailDraft}
+                  onChange={setDetailDraft}
+                  onDelete={deleteMemory}
+                  onUpdate={updateMemory}
+                />
+              </Stack>
             ) : null}
           </Container>
         </AppShell.Main>

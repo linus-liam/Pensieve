@@ -1,10 +1,10 @@
 import { useMemo } from "react";
-import { Button, Group, Paper, Text, TextInput } from "@mantine/core";
-import { UnavailableIconButton } from "./UnavailableIconButton";
+import { Button, Group, Paper, Stack, Text, Textarea } from "@mantine/core";
 
 interface CaptureComposerProps {
   value: string;
   canSave: boolean;
+  saving: boolean;
   onChange: (value: string) => void;
   onSave: () => void;
 }
@@ -13,7 +13,13 @@ function wordCount(text: string) {
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
-export function CaptureComposer({ value, canSave, onChange, onSave }: CaptureComposerProps) {
+export function CaptureComposer({
+  value,
+  canSave,
+  saving,
+  onChange,
+  onSave,
+}: CaptureComposerProps) {
   const words = useMemo(() => wordCount(value), [value]);
 
   return (
@@ -29,29 +35,37 @@ export function CaptureComposer({ value, canSave, onChange, onSave }: CaptureCom
         onSave();
       }}
     >
-      <Group align="flex-end" gap="sm">
-        <Group gap="xs">
-          <UnavailableIconButton label="Attach photo" icon="image" />
-          <UnavailableIconButton label="Record voice note" icon="mic" />
-          <UnavailableIconButton label="Add mood" icon="sentiment_satisfied" />
-        </Group>
-
-        <TextInput
+      <Stack gap="sm">
+        <Textarea
           aria-label="What's on your mind?"
-          flex={1}
+          rows={5}
           placeholder="What's on your mind?"
           value={value}
           onChange={(event) => onChange(event.currentTarget.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+              event.preventDefault();
+              onSave();
+            }
+          }}
         />
 
-        <Text c="dimmed" size="sm" style={{ whiteSpace: "nowrap" }}>
-          {words} {words === 1 ? "word" : "words"}
-        </Text>
+        <Group className="capture-composer__footer" gap="sm" justify="space-between">
+          <Text c="dimmed" size="sm" style={{ whiteSpace: "nowrap" }}>
+            {words} {words === 1 ? "word" : "words"}
+          </Text>
 
-        <Button aria-label="Save memory" disabled={!canSave} radius="sm" type="submit">
-          Save
-        </Button>
-      </Group>
+          <Button
+            aria-label="Save memory"
+            disabled={!canSave || saving}
+            loading={saving}
+            radius="sm"
+            type="submit"
+          >
+            Save
+          </Button>
+        </Group>
+      </Stack>
     </Paper>
   );
 }

@@ -33,23 +33,24 @@ function emptyResponse() {
 describe("App memory flow", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    window.history.pushState(null, "", "/");
   });
 
-  it("opens on the capture page with display-only body and a single composer input", async () => {
+  it("opens on the capture page with a focused composer and main navigation", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse([])));
 
     render(<App />);
 
-    expect(screen.getByRole("button", { name: "Pensieve" })).toBeInTheDocument();
+    expect(screen.queryByRole("banner")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Capture" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "What do you want to put down?" })).toBeInTheDocument();
     expect(screen.getByLabelText("What's on your mind?")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Open memories" })).toBeInTheDocument();
     expect(screen.getAllByRole("textbox")).toHaveLength(1);
     expect(screen.queryByRole("textbox", { name: /put down/i })).not.toBeInTheDocument();
     await waitFor(() => expect(fetch).toHaveBeenCalledWith("/api/memory-entries?limit=100", expect.any(Object)));
   });
 
-  it("saves a memory and shows the AI summary on the timeline", async () => {
+  it("saves a memory in place and shows the AI summary on the timeline", async () => {
     const user = userEvent.setup();
     vi.stubGlobal(
       "fetch",
@@ -63,11 +64,14 @@ describe("App memory flow", () => {
     await user.type(screen.getByLabelText("What's on your mind?"), firstEntry.raw_input);
     await user.click(screen.getAllByRole("button", { name: "Save memory" })[0]);
 
+    expect(screen.getByRole("heading", { name: "What do you want to put down?" })).toBeInTheDocument();
+    expect(await screen.findByText("Saved to your memories")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Memories" }));
     expect(await screen.findByText(firstEntry.ai_summary)).toBeInTheDocument();
-    expect(screen.getByText("Saved to your memories")).toBeInTheDocument();
   });
 
-  it("opens detail, edits, and deletes a memory", async () => {
+  it("opens detail, edits, and confirms before deleting a memory", async () => {
     const user = userEvent.setup();
     vi.stubGlobal(
       "fetch",
@@ -88,23 +92,28 @@ describe("App memory flow", () => {
 
     render(<App />);
 
-    await user.click(screen.getByRole("button", { name: "Open memories" }));
-    await user.click(await screen.findByRole("button", { name: /Writing the plan down/ }));
+    await user.click(screen.getByRole("button", { name: "Memories" }));
+    await user.click(await screen.findByRole("link", { name: /Open memory: Writing the plan down/ }));
 
     expect(screen.getByText("Summary")).toBeInTheDocument();
     expect(screen.getByLabelText("Original memory input")).toHaveValue(firstEntry.raw_input);
 
     await user.clear(screen.getByLabelText("Original memory input"));
     await user.type(screen.getByLabelText("Original memory input"), updatedEntry.raw_input);
-    await user.click(screen.getByRole("button", { name: "Save Changes" }));
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
 
     expect(await screen.findByText(updatedEntry.ai_summary)).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Delete" }));
+    await user.click(screen.getByRole("button", { name: "Delete memory" }));
+    const confirmDelete = await screen.findByRole("button", {
+      name: "Delete memory permanently",
+    });
+    expect(confirmDelete).toBeInTheDocument();
+    await user.click(confirmDelete);
     expect(await screen.findByText("No memories saved yet.")).toBeInTheDocument();
   });
 
-  it("submits on Enter from the composer input", async () => {
+  it("submits on Ctrl+Enter from the composer", async () => {
     const user = userEvent.setup();
     vi.stubGlobal(
       "fetch",
@@ -115,7 +124,8 @@ describe("App memory flow", () => {
 
     render(<App />);
 
-    await user.type(screen.getByLabelText("What's on your mind?"), "A quiet thought{Enter}");
+    await user.type(screen.getByLabelText("What's on your mind?"), "A quiet thought");
+    await user.keyboard("{Control>}{Enter}{/Control}");
 
     expect(await screen.findByText("Saved to your memories")).toBeInTheDocument();
   });
@@ -132,26 +142,18 @@ describe("App memory flow", () => {
     expect(screen.getByText("3 words")).toBeInTheDocument();
   });
 
-  it("marks controls that are not wired up yet", async () => {
+  it("does not surface unavailable controls as primary actions", async () => {
     const user = userEvent.setup();
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse([])));
 
     render(<App />);
 
-    const unavailableCaptureControls = [
-      "Attach photo (not available yet)",
-      "Record voice note (not available yet)",
-      "Add mood (not available yet)",
-    ];
+    expect(screen.queryByRole("button", { name: /Attach photo/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Record voice note/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Add mood/ })).not.toBeInTheDocument();
 
-    for (const name of unavailableCaptureControls) {
-      expect(screen.getByRole("button", { name })).toHaveAttribute("aria-disabled", "true");
-    }
+    await user.click(screen.getByRole("button", { name: "Memories" }));
 
-    await user.click(screen.getByRole("button", { name: "Open memories" }));
-
-    expect(
-      await screen.findByRole("button", { name: "Settings (not available yet)" })
-    ).toHaveAttribute("aria-disabled", "true");
+    expect(screen.queryByRole("button", { name: /Settings/ })).not.toBeInTheDocument();
   });
 });

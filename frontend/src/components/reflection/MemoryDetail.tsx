@@ -1,4 +1,5 @@
-import { Alert, Button, Group, Paper, Stack, Text, Textarea, Title } from "@mantine/core";
+import { useState } from "react";
+import { Alert, Button, Group, Modal, Paper, Stack, Text, Textarea, Title } from "@mantine/core";
 import type { Memory } from "../../types";
 
 interface MemoryDetailProps {
@@ -22,47 +23,88 @@ export function MemoryDetail({
   onDelete,
   onUpdate,
 }: MemoryDetailProps) {
+  const [deleteOpen, setDeleteOpen] = useState(false);
+
   if (!memory) {
-    return <Text c="dimmed">Select a memory from the timeline.</Text>;
+    return <Text c="dimmed">Memory not found. Return to memories and choose another entry.</Text>;
   }
 
   return (
-    <Paper component="article" p="md" radius="md" shadow="none" withBorder>
-      <Stack gap="lg">
-        <Text c="dimmed" component="time" size="sm">
-          {memory.day} at {memory.time}
-        </Text>
+    <>
+      <Paper component="article" p="md" radius="md" shadow="none" withBorder>
+        <Stack gap="lg">
+          <Text c="dimmed" component="time" size="sm">
+            {memory.day} at {memory.time}
+          </Text>
 
-        <Stack gap="xs">
-          <Title order={2} size="h3">
-            Summary
-          </Title>
-          <Text>{memory.summary}</Text>
+          <Stack gap="xs">
+            <Title order={2} size="h3">
+              Summary
+            </Title>
+            <Text>{memory.summary}</Text>
+          </Stack>
+
+          <Textarea
+            label="Original"
+            rows={6}
+            value={value}
+            aria-label="Original memory input"
+            onChange={(event) => onChange(event.currentTarget.value)}
+          />
+
+          {error ? (
+            <Alert color="red" role="alert" title="Something went wrong">
+              {error}
+            </Alert>
+          ) : null}
+
+          <Group className="memory-detail__actions" justify="space-between">
+            <Button
+              color="red"
+              disabled={updating}
+              radius="sm"
+              variant="subtle"
+              onClick={() => setDeleteOpen(true)}
+            >
+              Delete memory
+            </Button>
+            <Button disabled={!canUpdate || updating} loading={updating} radius="sm" onClick={onUpdate}>
+              Save changes
+            </Button>
+          </Group>
         </Stack>
+      </Paper>
 
-        <Textarea
-          label="Original"
-          rows={6}
-          value={value}
-          aria-label="Original memory input"
-          onChange={(event) => onChange(event.currentTarget.value)}
-        />
-
-        {error ? (
-          <Alert color="red" role="alert" title="Something went wrong">
-            {error}
-          </Alert>
-        ) : null}
-
-        <Group justify="flex-end">
-          <Button color="red" disabled={updating} radius="sm" variant="light" onClick={onDelete}>
-            Delete
-          </Button>
-          <Button disabled={!canUpdate || updating} radius="sm" onClick={onUpdate}>
-            {updating ? "Saving..." : "Save Changes"}
-          </Button>
-        </Group>
-      </Stack>
-    </Paper>
+      <Modal
+        centered
+        opened={deleteOpen}
+        radius="md"
+        title="Delete memory?"
+        onClose={() => setDeleteOpen(false)}
+      >
+        <Stack gap="md">
+          <Text size="sm">
+            This removes the memory from your timeline permanently. This cannot be undone.
+          </Text>
+          <Group justify="flex-end">
+            <Button disabled={updating} radius="sm" variant="default" onClick={() => setDeleteOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              color="red"
+              disabled={updating}
+              loading={updating}
+              radius="sm"
+              onClick={() => {
+                setDeleteOpen(false);
+                onDelete();
+              }}
+            >
+              Delete memory permanently
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+    </>
   );
 }
