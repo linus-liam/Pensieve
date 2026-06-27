@@ -1,8 +1,8 @@
 import "./config/env.js";
 import cors from "cors";
 import express from "express";
+import type { RequestHandler } from "express";
 import helmet from "helmet";
-import memoryEntriesRouter from "./routes/memoryEntries.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { apiRateLimit } from "./middleware/rateLimit.js";
 import { requireAuth } from "./middleware/requireAuth.js";
@@ -15,6 +15,17 @@ async function ensureDbSchema() {
   const { ensureSchema } = await import("./db/ensureSchema.js");
   return ensureSchema();
 }
+
+let memoryEntriesRouter: RequestHandler | null = null;
+
+const handleMemoryEntries: RequestHandler = async (req, res, next) => {
+  try {
+    memoryEntriesRouter ??= (await import("./routes/memoryEntries.js")).default;
+    memoryEntriesRouter(req, res, next);
+  } catch (error) {
+    next(error);
+  }
+};
 
 export function createApp() {
   const app = express();
@@ -38,7 +49,7 @@ export function createApp() {
     });
 
     app.use(prefix, apiRateLimit);
-    app.use(`${prefix}/memory-entries`, requireAuth, memoryEntriesRouter);
+    app.use(`${prefix}/memory-entries`, requireAuth, handleMemoryEntries);
 
     app.use(prefix, (_req, res) => {
       res.status(404).json({ error: "not found", code: "not_found" });
