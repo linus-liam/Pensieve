@@ -1,16 +1,10 @@
+import { Badge } from "@mantine/core";
 import type { MemorySourceType } from "../../types";
 
 interface SourceBadgeProps {
   label: string;
   type: MemorySourceType;
 }
-
-const icons: Record<MemorySourceType, string> = {
-  text: "edit_note",
-  screenshot: "screenshot_monitor",
-  photo: "image",
-  voice: "mic",
-};
 
 const labels: Record<MemorySourceType, string> = {
   text: "Text",
@@ -21,11 +15,8 @@ const labels: Record<MemorySourceType, string> = {
 
 export function SourceBadge({ label, type }: SourceBadgeProps) {
   return (
-    <span className="source-badge">
-      <span className="material-symbols-outlined source-badge__icon" aria-hidden="true">
-        {icons[type]}
-      </span>
+    <Badge color="gray" radius="sm" size="sm" variant="outline">
       {labels[type] ?? label}
-    </span>
+    </Badge>
   );
 }

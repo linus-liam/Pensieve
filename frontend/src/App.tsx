@@ -1,10 +1,24 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  Alert,
+  AppShell,
+  Box,
+  Button,
+  Container,
+  Group,
+  Loader,
+  MantineProvider,
+  Stack,
+  Text,
+} from "@mantine/core";
 import { api } from "./api/client";
 import { CaptureComposer } from "./components/reflection/CaptureComposer";
 import { CaptureDisplay } from "./components/reflection/CaptureDisplay";
+import { MemoryDetail } from "./components/reflection/MemoryDetail";
 import { SaveConfirmation } from "./components/reflection/SaveConfirmation";
 import { SideNav } from "./components/reflection/SideNav";
 import { Timeline } from "./components/reflection/Timeline";
+import { UnavailableIconButton } from "./components/reflection/UnavailableIconButton";
 import type { Memory, MemoryEntry } from "./types";
 
 type Page = "capture" | "memories" | "detail";
@@ -59,6 +73,72 @@ function toMemory(entry: MemoryEntry): Memory {
     rawInput: entry.raw_input,
     tags: inferTags(entry.raw_input),
   };
+}
+
+interface AppHeaderProps {
+  page: Page;
+  onNavigate: (page: Page) => void;
+  onRefresh: () => void;
+}
+
+function getHeaderTitle(page: Page) {
+  if (page === "capture") return "New Entry";
+  if (page === "memories") return "Memories";
+  return "Detail";
+}
+
+function AppHeader({ page, onNavigate, onRefresh }: AppHeaderProps) {
+  const backTarget = page === "detail" ? "memories" : "capture";
+  const backLabel = page === "detail" ? "Back to memories" : "Back to capture";
+
+  return (
+    <AppShell.Header>
+      <Group h="100%" gap="sm" px="md" wrap="nowrap">
+        {page !== "capture" ? (
+          <Button
+            aria-label={backLabel}
+            radius="sm"
+            size="xs"
+            variant="subtle"
+            onClick={() => onNavigate(backTarget)}
+          >
+            Back
+          </Button>
+        ) : null}
+
+        <Button radius="sm" variant="subtle" onClick={() => onNavigate("capture")}>
+          Pensieve
+        </Button>
+
+        <Text fw={600} size="sm">
+          {getHeaderTitle(page)}
+        </Text>
+
+        <Box style={{ flex: 1 }} />
+
+        {page === "capture" ? (
+          <Button
+            aria-label="Open memories"
+            radius="sm"
+            size="xs"
+            variant="default"
+            onClick={() => onNavigate("memories")}
+          >
+            Memories
+          </Button>
+        ) : null}
+
+        {page === "memories" ? (
+          <Group gap="xs" wrap="nowrap">
+            <Button radius="sm" size="xs" variant="default" onClick={onRefresh}>
+              Refresh
+            </Button>
+            <UnavailableIconButton label="Settings" icon="settings" />
+          </Group>
+        ) : null}
+      </Group>
+    </AppShell.Header>
+  );
 }
 
 export function App() {
@@ -170,160 +250,79 @@ export function App() {
   }, [selectedEntry, updating]);
 
   return (
-    <div className="app-shell">
-      <div className="app-atmosphere" aria-hidden="true" />
+    <MantineProvider defaultColorScheme="light">
+      <AppShell
+        header={{ height: 64 }}
+        navbar={{ width: 240, breakpoint: "sm", collapsed: { mobile: true } }}
+        padding="md"
+      >
+        <AppHeader page={page} onNavigate={navigate} onRefresh={loadEntries} />
 
-      <SideNav page={page === "detail" ? "memories" : page} onNavigate={navigate} />
+        <AppShell.Navbar p="md">
+          <SideNav page={page === "detail" ? "memories" : page} onNavigate={navigate} />
+        </AppShell.Navbar>
 
-      <div className="app-content">
-        {page === "capture" ? (
-          <>
-            <header className="top-bar top-bar--capture" aria-label="Primary">
-              <button className="brand-button" type="button" onClick={() => navigate("capture")}>
-                Pensieve
-              </button>
-              <button
-                className="nav-pill-button"
-                type="button"
-                aria-label="Open memories"
-                onClick={() => navigate("memories")}
-              >
-                Memories
-              </button>
-            </header>
+        <AppShell.Main>
+          <Container py="lg" size="sm">
+            {page === "capture" ? (
+              <Stack gap="lg">
+                <CaptureDisplay />
+                {error ? (
+                  <Alert color="red" role="alert" title="Something went wrong">
+                    {error}
+                  </Alert>
+                ) : null}
+                <CaptureComposer
+                  canSave={canSave}
+                  value={draft}
+                  onChange={setDraft}
+                  onSave={saveMemory}
+                />
+              </Stack>
+            ) : null}
 
-            <header className="desktop-top-bar desktop-top-bar--capture" aria-label="Capture header">
-              <div className="desktop-top-bar__label">
-                <span className="material-symbols-outlined" aria-hidden="true">
-                  flare
-                </span>
-                New Entry
-              </div>
-            </header>
+            {page === "memories" ? (
+              <Stack gap="md">
+                {error ? (
+                  <Alert color="red" role="alert" title="Something went wrong">
+                    {error}
+                  </Alert>
+                ) : null}
 
-            <main className="capture-page">
-              <CaptureDisplay />
-              {error ? <p className="inline-error" role="alert">{error}</p> : null}
-            </main>
+                {loading ? (
+                  <Group gap="xs">
+                    <Loader size="sm" />
+                    <Text c="dimmed">Loading memories...</Text>
+                  </Group>
+                ) : null}
 
-            <CaptureComposer
-              value={draft}
-              onChange={setDraft}
-              onSave={saveMemory}
-              canSave={canSave}
-            />
-          </>
-        ) : page === "memories" ? (
-          <>
-            <header className="top-bar top-bar--timeline" aria-label="Memories">
-              <div className="timeline-brand">
-                <button className="icon-button back-button" type="button" aria-label="Back to capture" onClick={() => navigate("capture")}>
-                  <span className="material-symbols-outlined" aria-hidden="true">
-                    arrow_back
-                  </span>
-                </button>
-                <button className="brand-button brand-button--small" type="button" onClick={() => navigate("capture")}>
-                  Pensieve
-                </button>
-              </div>
-              <span className="timeline-title">Memories</span>
-            </header>
+                {!loading && memories.length === 0 ? (
+                  <Text c="dimmed">No memories saved yet.</Text>
+                ) : null}
 
-            <header className="desktop-top-bar desktop-top-bar--memories" aria-label="Memories header">
-              <h2 className="desktop-top-bar__title">Memories</h2>
-              <div className="desktop-top-bar__actions">
-                <button className="icon-button" type="button" aria-label="Refresh memories" onClick={loadEntries}>
-                  <span className="material-symbols-outlined" aria-hidden="true">
-                    refresh
-                  </span>
-                </button>
-                <button className="icon-button" type="button" aria-label="Settings">
-                  <span className="material-symbols-outlined" aria-hidden="true">
-                    settings
-                  </span>
-                </button>
-              </div>
-            </header>
+                {memories.length > 0 ? (
+                  <Timeline memories={memories} onOpenMemory={openMemory} />
+                ) : null}
+              </Stack>
+            ) : null}
 
-            <main className="timeline-page">
-              {error ? <p className="inline-error" role="alert">{error}</p> : null}
-              {loading ? <p className="empty-state">Loading memories...</p> : null}
-              {!loading && memories.length === 0 ? (
-                <p className="empty-state">No memories saved yet.</p>
-              ) : null}
-              {memories.length > 0 ? (
-                <Timeline memories={memories} onOpenMemory={openMemory} />
-              ) : null}
-            </main>
-          </>
-        ) : (
-          <>
-            <header className="top-bar top-bar--timeline" aria-label="Memory detail">
-              <div className="timeline-brand">
-                <button className="icon-button back-button" type="button" aria-label="Back to memories" onClick={() => navigate("memories")}>
-                  <span className="material-symbols-outlined" aria-hidden="true">
-                    arrow_back
-                  </span>
-                </button>
-                <button className="brand-button brand-button--small" type="button" onClick={() => navigate("capture")}>
-                  Pensieve
-                </button>
-              </div>
-              <span className="timeline-title">Detail</span>
-            </header>
-
-            <main className="detail-page">
-              {selectedMemory ? (
-                <article className="detail-panel">
-                  <div className="detail-panel__meta">
-                    <time>{selectedMemory.day} at {selectedMemory.time}</time>
-                  </div>
-
-                  <section className="detail-section" aria-label="AI summary">
-                    <h2>Summary</h2>
-                    <p>{selectedMemory.summary}</p>
-                  </section>
-
-                  <section className="detail-section" aria-label="Original memory">
-                    <h2>Original</h2>
-                    <textarea
-                      className="detail-textarea"
-                      value={detailDraft}
-                      aria-label="Original memory input"
-                      onChange={(event) => setDetailDraft(event.target.value)}
-                    />
-                  </section>
-
-                  {error ? <p className="inline-error" role="alert">{error}</p> : null}
-
-                  <div className="detail-actions">
-                    <button
-                      className="detail-button detail-button--danger"
-                      type="button"
-                      disabled={updating}
-                      onClick={deleteMemory}
-                    >
-                      Delete
-                    </button>
-                    <button
-                      className="detail-button detail-button--primary"
-                      type="button"
-                      disabled={!canUpdate || updating}
-                      onClick={updateMemory}
-                    >
-                      {updating ? "Saving..." : "Save Changes"}
-                    </button>
-                  </div>
-                </article>
-              ) : (
-                <p className="empty-state">Select a memory from the timeline.</p>
-              )}
-            </main>
-          </>
-        )}
-      </div>
+            {page === "detail" ? (
+              <MemoryDetail
+                canUpdate={canUpdate}
+                error={error}
+                memory={selectedMemory}
+                updating={updating}
+                value={detailDraft}
+                onChange={setDetailDraft}
+                onDelete={deleteMemory}
+                onUpdate={updateMemory}
+              />
+            ) : null}
+          </Container>
+        </AppShell.Main>
+      </AppShell>
 
       <SaveConfirmation show={showConfirmation} onDone={() => setShowConfirmation(false)} />
-    </div>
+    </MantineProvider>
   );
 }

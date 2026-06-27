@@ -1,3 +1,5 @@
+import { NavLink, Stack, Text, Title } from "@mantine/core";
+
 type Page = "capture" | "memories";
 
 interface SideNavProps {
@@ -7,38 +9,32 @@ interface SideNavProps {
 
 export function SideNav({ page, onNavigate }: SideNavProps) {
   return (
-    <nav className="side-nav" aria-label="Main navigation">
-      <div className="side-nav__brand">
-        <h1 className="side-nav__title">Pensieve</h1>
-        <p className="side-nav__subtitle">Digital Sanctuary</p>
-      </div>
+    <Stack aria-label="Main navigation" component="nav" gap="lg">
+      <Stack gap={2}>
+        <Title order={1} size="h3">
+          Pensieve
+        </Title>
+        <Text c="dimmed" size="sm">
+          Memory capture
+        </Text>
+      </Stack>
 
-      <div className="side-nav__links">
-        <button
-          type="button"
-          className={`side-nav__link ${page === "capture" ? "side-nav__link--active" : ""}`}
+      <Stack gap="xs">
+        <NavLink
+          active={page === "capture"}
+          component="button"
+          label="Capture"
+          variant="light"
           onClick={() => onNavigate("capture")}
-        >
-          <span className="material-symbols-outlined" aria-hidden="true">
-            edit_note
-          </span>
-          Capture
-        </button>
-        <button
-          type="button"
-          className={`side-nav__link ${page === "memories" ? "side-nav__link--active" : ""}`}
+        />
+        <NavLink
+          active={page === "memories"}
+          component="button"
+          label="Memories"
+          variant="light"
           onClick={() => onNavigate("memories")}
-        >
-          <span
-            className="material-symbols-outlined"
-            aria-hidden="true"
-            style={page === "memories" ? { fontVariationSettings: "'FILL' 1" } : undefined}
-          >
-            auto_stories
-          </span>
-          Memories
-        </button>
-      </div>
-    </nav>
+        />
+      </Stack>
+    </Stack>
   );
 }

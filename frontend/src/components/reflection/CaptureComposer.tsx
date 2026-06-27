@@ -1,4 +1,6 @@
 import { useMemo } from "react";
+import { Button, Group, Paper, Text, TextInput } from "@mantine/core";
+import { UnavailableIconButton } from "./UnavailableIconButton";
 
 interface CaptureComposerProps {
   value: string;
@@ -15,60 +17,41 @@ export function CaptureComposer({ value, canSave, onChange, onSave }: CaptureCom
   const words = useMemo(() => wordCount(value), [value]);
 
   return (
-    <div className="capture-composer" aria-label="Capture actions">
-      <form
-        className="capture-composer__inner"
-        onSubmit={(event) => {
-          event.preventDefault();
-          onSave();
-        }}
-      >
-        <div className="capture-composer__tools">
-          <button className="icon-action" type="button" aria-label="Attach photo">
-            <span className="material-symbols-outlined" aria-hidden="true">
-              image
-            </span>
-          </button>
-          <button className="icon-action" type="button" aria-label="Record voice note">
-            <span className="material-symbols-outlined" aria-hidden="true">
-              mic
-            </span>
-          </button>
-          <button className="icon-action" type="button" aria-label="Add mood">
-            <span className="material-symbols-outlined" aria-hidden="true">
-              sentiment_satisfied
-            </span>
-          </button>
-        </div>
+    <Paper
+      aria-label="Capture actions"
+      component="form"
+      p="md"
+      radius="md"
+      shadow="none"
+      withBorder
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSave();
+      }}
+    >
+      <Group align="flex-end" gap="sm">
+        <Group gap="xs">
+          <UnavailableIconButton label="Attach photo" icon="image" />
+          <UnavailableIconButton label="Record voice note" icon="mic" />
+          <UnavailableIconButton label="Add mood" icon="sentiment_satisfied" />
+        </Group>
 
-        <input
-          className="capture-composer__input"
-          type="text"
-          value={value}
-          placeholder="What's on your mind?"
+        <TextInput
           aria-label="What's on your mind?"
-          onChange={(event) => onChange(event.target.value)}
+          flex={1}
+          placeholder="What's on your mind?"
+          value={value}
+          onChange={(event) => onChange(event.currentTarget.value)}
         />
 
-        <span className="capture-composer__count">
+        <Text c="dimmed" size="sm" style={{ whiteSpace: "nowrap" }}>
           {words} {words === 1 ? "word" : "words"}
-        </span>
+        </Text>
 
-        <button
-          className="icon-action icon-action--primary"
-          type="submit"
-          disabled={!canSave}
-          aria-label="Save memory"
-        >
-          <span
-            className="material-symbols-outlined"
-            aria-hidden="true"
-            style={{ fontVariationSettings: "'FILL' 1" }}
-          >
-            add_circle
-          </span>
-        </button>
-      </form>
-    </div>
+        <Button aria-label="Save memory" disabled={!canSave} radius="sm" type="submit">
+          Save
+        </Button>
+      </Group>
+    </Paper>
   );
 }

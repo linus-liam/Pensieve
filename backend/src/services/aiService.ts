@@ -7,6 +7,14 @@ const MAX_SUMMARY_INPUT_CHARS = Number(process.env.MEMORY_RAW_INPUT_MAX_CHARS ??
 const SUMMARY_MAX_TOKENS = Number(process.env.AI_SUMMARY_MAX_TOKENS ?? 60);
 let client: OpenAI | null = null;
 
+function getTokenLimitParam() {
+  if (SUMMARY_MODEL.startsWith("gpt-5")) {
+    return { max_completion_tokens: SUMMARY_MAX_TOKENS };
+  }
+
+  return { max_tokens: SUMMARY_MAX_TOKENS };
+}
+
 function getClient(): OpenAI {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
@@ -36,7 +44,7 @@ export async function summarizeMemory(rawInput: string): Promise<string> {
     getClient().chat.completions.create(
       {
         model: SUMMARY_MODEL,
-        max_tokens: SUMMARY_MAX_TOKENS,
+        ...getTokenLimitParam(),
         temperature: 0.2,
         messages: [
           {

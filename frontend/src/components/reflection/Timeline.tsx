@@ -1,3 +1,4 @@
+import { Divider, Stack, Text, Title } from "@mantine/core";
 import type { Memory } from "../../types";
 import { TimelineCard } from "./TimelineCard";
 
@@ -29,12 +30,15 @@ export function Timeline({ memories, onOpenMemory }: TimelineProps) {
   const groups = groupMemories(memories);
 
   return (
-    <>
-      <div className="timeline">
-        {groups.map(([day, dayMemories]) => (
-          <section className="timeline-section" key={day} aria-labelledby={`timeline-${day}`}>
-            <h2 id={`timeline-${day}`}>{day}</h2>
-            <div className="timeline-stack">
+    <Stack gap="xl">
+      {groups.map(([day, dayMemories]) => (
+        <section key={day} aria-labelledby={`timeline-${day}`}>
+          <Stack gap="sm">
+            <Title id={`timeline-${day}`} order={2} size="h3">
+              {day}
+            </Title>
+
+            <Stack gap="sm">
               {dayMemories.map((memory) => (
                 <TimelineCard
                   key={memory.id}
@@ -43,17 +47,15 @@ export function Timeline({ memories, onOpenMemory }: TimelineProps) {
                   onOpen={() => onOpenMemory(memory)}
                 />
               ))}
-            </div>
-          </section>
-        ))}
-      </div>
+            </Stack>
+          </Stack>
+        </section>
+      ))}
 
-      <footer className="timeline-end">
-        <span className="material-symbols-outlined timeline-end__icon" aria-hidden="true">
-          all_inclusive
-        </span>
-        <p>That's all for now. Take a breath.</p>
-      </footer>
-    </>
+      <Divider />
+      <Text c="dimmed" component="footer" size="sm">
+        That's all for now. Take a breath.
+      </Text>
+    </Stack>
   );
 }

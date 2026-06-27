@@ -131,4 +131,27 @@ describe("App memory flow", () => {
     await user.type(screen.getByLabelText("What's on your mind?"), "one two three");
     expect(screen.getByText("3 words")).toBeInTheDocument();
   });
+
+  it("marks controls that are not wired up yet", async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse([])));
+
+    render(<App />);
+
+    const unavailableCaptureControls = [
+      "Attach photo (not available yet)",
+      "Record voice note (not available yet)",
+      "Add mood (not available yet)",
+    ];
+
+    for (const name of unavailableCaptureControls) {
+      expect(screen.getByRole("button", { name })).toHaveAttribute("aria-disabled", "true");
+    }
+
+    await user.click(screen.getByRole("button", { name: "Open memories" }));
+
+    expect(
+      await screen.findByRole("button", { name: "Settings (not available yet)" })
+    ).toHaveAttribute("aria-disabled", "true");
+  });
 });
