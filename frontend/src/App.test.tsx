@@ -167,6 +167,17 @@ describe("App memory flow", () => {
     ).not.toHaveAttribute("aria-current");
   });
 
+  it("does not use legacy CSS sizing classes for the capture chat shell", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse([])));
+
+    renderApp();
+
+    expect(await screen.findByLabelText("Memory chat")).not.toHaveClass("capture-chat");
+    expect(screen.getByLabelText("Memory capture conversation")).not.toHaveClass(
+      "capture-chat__messages"
+    );
+  });
+
   it("keeps Memories active on detail and returns to the memories page from Back", async () => {
     const user = userEvent.setup();
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse([firstEntry])));

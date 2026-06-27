@@ -51,19 +51,20 @@ export function CaptureComposer({
 
         <Paper
           aria-label="Memory chat"
-          className="capture-chat"
           p="md"
           radius="md"
           shadow="none"
           withBorder
         >
-          <Stack gap="md" h="100%">
+          <Stack gap="md">
             <Box
               ref={messagesRef}
               aria-label="Memory capture conversation"
               aria-live="polite"
-              className="capture-chat__messages"
+              mah="min(54vh, 520px)"
+              pr={4}
               role="log"
+              style={{ overflowY: "auto" }}
             >
               <Stack gap="sm">
                 {messages.map((message) => (
@@ -103,8 +104,9 @@ export function CaptureComposer({
             </Box>
 
             <Box
-              className="capture-chat__form"
               component="form"
+              pt="md"
+              style={{ borderTop: "1px solid var(--mantine-color-gray-2)" }}
               onSubmit={(event) => {
                 event.preventDefault();
                 onSave();
