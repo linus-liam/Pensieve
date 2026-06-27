@@ -11,18 +11,30 @@ serves the timeline/detail flow.
    ```sh
    cp .env.local.example .env.local
    cp backend/.env.example backend/.env
+   cp frontend/.env.example frontend/.env.local
    ```
 
 2. Set `OPENAI_API_KEY` in `.env.local`.
 
-3. Start Postgres and run migrations:
+3. Create or open a Supabase project, then set these auth values:
+
+   - `SUPABASE_URL` and `SUPABASE_ANON_KEY` in `backend/.env`
+   - `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in `frontend/.env.local`
+
+   The URL is `https://<project-ref>.supabase.co`; the anon key is under
+   Supabase Project Settings -> API.
+
+4. In Supabase Auth, enable the Google provider and add
+   `http://localhost:5173` as an allowed redirect URL.
+
+5. Start Postgres and run migrations:
 
    ```sh
    npm run db:up
    npm run db:migrate
    ```
 
-4. Start the apps:
+6. Start the apps:
 
    ```sh
    npm run dev:backend
@@ -36,7 +48,7 @@ so host-run Node commands should use `DB_PORT=5433`.
 The backend loads environment values from root `.env`, root `.env.local`,
 `backend/.env`, and `backend/.env.local`. Put shared local secrets like
 `OPENAI_API_KEY` in root `.env.local`; keep backend-only database defaults in
-`backend/.env`.
+`backend/.env`. Vite reads frontend auth values from `frontend/.env.local`.
 
 ## Docker Modes
 
@@ -70,6 +82,10 @@ backend on `3001`.
 - `PATCH /api/memory-entries/:id` updates `rawInput` and regenerates the summary.
 - `DELETE /api/memory-entries/:id` removes a memory.
 
+All memory endpoints require `Authorization: Bearer <supabase_access_token>`.
+The backend verifies that token with Supabase Auth and scopes every memory query
+to the authenticated user id.
+
 ## Verification
 
 Run checks in each app:
@@ -84,5 +100,5 @@ Backend integration tests require a test database:
 ```sh
 createdb -U pensieve pensieve_test
 cd backend
-TEST_DATABASE_URL=postgres://pensieve:pensieve@localhost:5432/pensieve_test npm test
+TEST_DATABASE_URL=postgres://pensieve:pensieve@localhost:5433/pensieve_test npm test
 ```

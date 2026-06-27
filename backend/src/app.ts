@@ -6,6 +6,7 @@ import memoryEntriesRouter from "./routes/memoryEntries.js";
 import { ensureSchema } from "./db/ensureSchema.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { apiRateLimit } from "./middleware/rateLimit.js";
+import { requireAuth } from "./middleware/requireAuth.js";
 
 const corsOrigin =
   process.env.FRONTEND_URL ??
@@ -29,10 +30,10 @@ export function createApp() {
     ensureSchema().then(() => next(), next);
   });
 
-  app.use("/api", apiRateLimit);
-  app.use("/api/memory-entries", memoryEntriesRouter);
-
   app.get("/api/health", (_req, res) => res.json({ ok: true }));
+
+  app.use("/api", apiRateLimit);
+  app.use("/api/memory-entries", requireAuth, memoryEntriesRouter);
 
   app.use("/api", (_req, res) => {
     res.status(404).json({ error: "not found", code: "not_found" });

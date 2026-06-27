@@ -13,6 +13,8 @@ import {
   Title,
 } from "@mantine/core";
 import { api } from "./api/client";
+import { AuthGate } from "./auth/AuthGate";
+import { useAuth } from "./auth/AuthProvider";
 import { CaptureComposer } from "./components/reflection/CaptureComposer";
 import { CaptureDisplay } from "./components/reflection/CaptureDisplay";
 import { MemoryDetail } from "./components/reflection/MemoryDetail";
@@ -125,7 +127,8 @@ function MobileRouteSwitcher({ page, onNavigate }: MobileRouteSwitcherProps) {
   );
 }
 
-export function App() {
+function AuthenticatedApp() {
+  const { signOut, signingOut, user } = useAuth();
   const initialRoute = useMemo(getRouteFromHash, []);
   const [page, setPage] = useState<Page>(initialRoute.page);
   const [draft, setDraft] = useState("");
@@ -288,120 +291,153 @@ export function App() {
   }, [navigate, selectedEntry, updating]);
 
   return (
-    <MantineProvider defaultColorScheme="light">
+    <>
       <AppShell
         navbar={{ width: 240, breakpoint: "sm", collapsed: { mobile: true } }}
         padding="md"
       >
         <AppShell.Navbar p="md">
-          <SideNav page={page === "detail" ? "memories" : page} onNavigate={navigateFromNav} />
+          <SideNav
+            page={page === "detail" ? "memories" : page}
+            signingOut={signingOut}
+            userEmail={user?.email ?? null}
+            onNavigate={navigateFromNav}
+            onSignOut={signOut}
+          />
         </AppShell.Navbar>
 
         <AppShell.Main>
           <Container py="lg" size="sm">
-            <MobileRouteSwitcher page={page} onNavigate={navigateFromNav} />
+            <Stack gap="md">
+              <Group className="account-bar" gap="sm" justify="space-between" wrap="nowrap">
+                <Text c="dimmed" lineClamp={1} size="sm">
+                  {user?.email ?? "Google account"}
+                </Text>
+                <Button
+                  loading={signingOut}
+                  radius="sm"
+                  size="xs"
+                  variant="default"
+                  onClick={signOut}
+                >
+                  Sign out
+                </Button>
+              </Group>
 
-            {page === "capture" ? (
-              <Stack gap="lg" mt={{ base: "md", sm: 0 }}>
-                <CaptureDisplay />
-                {error ? (
-                  <Alert color="red" role="alert" title="Something went wrong">
-                    {error}
-                  </Alert>
-                ) : null}
-                <CaptureComposer
-                  canSave={canSave}
-                  saving={saving}
-                  value={draft}
-                  onChange={setDraft}
-                  onSave={saveMemory}
-                />
-              </Stack>
-            ) : null}
+              <MobileRouteSwitcher page={page} onNavigate={navigateFromNav} />
 
-            {page === "memories" ? (
-              <Stack gap="md" mt={{ base: "md", sm: 0 }}>
-                <Group justify="space-between" wrap="nowrap">
-                  <Title order={2} size="h2">
-                    Memories
-                  </Title>
-                  <Button radius="sm" size="xs" variant="default" onClick={loadEntries}>
-                    Refresh
+              {page === "capture" ? (
+                <Stack gap="lg">
+                  <CaptureDisplay />
+                  {error ? (
+                    <Alert color="red" role="alert" title="Something went wrong">
+                      {error}
+                    </Alert>
+                  ) : null}
+                  <CaptureComposer
+                    canSave={canSave}
+                    saving={saving}
+                    value={draft}
+                    onChange={setDraft}
+                    onSave={saveMemory}
+                  />
+                </Stack>
+              ) : null}
+
+              {page === "memories" ? (
+                <Stack gap="md">
+                  <Group justify="space-between" wrap="nowrap">
+                    <Title order={2} size="h2">
+                      Memories
+                    </Title>
+                    <Button radius="sm" size="xs" variant="default" onClick={loadEntries}>
+                      Refresh
+                    </Button>
+                  </Group>
+
+                  {error ? (
+                    <Alert color="red" role="alert" title="Something went wrong">
+                      {error}
+                    </Alert>
+                  ) : null}
+
+                  {loading ? (
+                    <Group gap="xs">
+                      <Loader size="sm" />
+                      <Text c="dimmed">Loading memories...</Text>
+                    </Group>
+                  ) : null}
+
+                  {!loading && memories.length === 0 ? (
+                    <Text c="dimmed">No memories saved yet.</Text>
+                  ) : null}
+
+                  {memories.length > 0 ? (
+                    <Timeline memories={memories} onOpenMemory={openMemory} />
+                  ) : null}
+                </Stack>
+              ) : null}
+
+              {page === "detail" && loading && !selectedMemory ? (
+                <Stack gap="md">
+                  <Button
+                    radius="sm"
+                    size="xs"
+                    variant="subtle"
+                    w="fit-content"
+                    onClick={() => navigate("memories")}
+                  >
+                    Back to memories
                   </Button>
-                </Group>
-
-                {error ? (
-                  <Alert color="red" role="alert" title="Something went wrong">
-                    {error}
-                  </Alert>
-                ) : null}
-
-                {loading ? (
                   <Group gap="xs">
                     <Loader size="sm" />
-                    <Text c="dimmed">Loading memories...</Text>
+                    <Text c="dimmed">Loading memory...</Text>
                   </Group>
-                ) : null}
+                </Stack>
+              ) : null}
 
-                {!loading && memories.length === 0 ? (
-                  <Text c="dimmed">No memories saved yet.</Text>
-                ) : null}
-
-                {memories.length > 0 ? (
-                  <Timeline memories={memories} onOpenMemory={openMemory} />
-                ) : null}
-              </Stack>
-            ) : null}
-
-            {page === "detail" && loading && !selectedMemory ? (
-              <Stack gap="md" mt={{ base: "md", sm: 0 }}>
-                <Button
-                  radius="sm"
-                  size="xs"
-                  variant="subtle"
-                  w="fit-content"
-                  onClick={() => navigate("memories")}
-                >
-                  Back to memories
-                </Button>
-                <Group gap="xs">
-                  <Loader size="sm" />
-                  <Text c="dimmed">Loading memory...</Text>
-                </Group>
-              </Stack>
-            ) : null}
-
-            {page === "detail" && (!loading || selectedMemory) ? (
-              <Stack gap="md" mt={{ base: "md", sm: 0 }}>
-                <Button
-                  radius="sm"
-                  size="xs"
-                  variant="subtle"
-                  w="fit-content"
-                  onClick={() => navigate("memories")}
-                >
-                  Back to memories
-                </Button>
-                <Title order={2} size="h2">
-                  Memory detail
-                </Title>
-                <MemoryDetail
-                  canUpdate={canUpdate}
-                  error={error}
-                  memory={selectedMemory}
-                  updating={updating}
-                  value={detailDraft}
-                  onChange={setDetailDraft}
-                  onDelete={deleteMemory}
-                  onUpdate={updateMemory}
-                />
-              </Stack>
-            ) : null}
+              {page === "detail" && (!loading || selectedMemory) ? (
+                <Stack gap="md">
+                  <Button
+                    radius="sm"
+                    size="xs"
+                    variant="subtle"
+                    w="fit-content"
+                    onClick={() => navigate("memories")}
+                  >
+                    Back to memories
+                  </Button>
+                  <Title order={2} size="h2">
+                    Memory detail
+                  </Title>
+                  <MemoryDetail
+                    canUpdate={canUpdate}
+                    error={error}
+                    memory={selectedMemory}
+                    updating={updating}
+                    value={detailDraft}
+                    onChange={setDetailDraft}
+                    onDelete={deleteMemory}
+                    onUpdate={updateMemory}
+                  />
+                </Stack>
+              ) : null}
+            </Stack>
           </Container>
         </AppShell.Main>
       </AppShell>
 
       <SaveConfirmation show={showConfirmation} onDone={() => setShowConfirmation(false)} />
+    </>
+  );
+}
+
+export function App() {
+  return (
+    <MantineProvider defaultColorScheme="light">
+      <AuthGate>
+        <AuthenticatedApp />
+      </AuthGate>
     </MantineProvider>
   );
 }

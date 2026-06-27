@@ -20,25 +20,35 @@ the pooled connection string.
 No separate migrate step is required on Vercel. The API lazily creates the
 `memory_entries` table on first request via `backend/src/db/schema.ts`.
 
-## 3. Environment Variables
+## 3. Configure Auth
+
+In Supabase Auth, enable the Google provider. Add your production Vercel URL to
+the allowed redirect URLs, for example `https://<your-domain>`.
+
+## 4. Environment Variables
 
 | Variable | Required | Notes |
 | --- | --- | --- |
 | `OPENAI_API_KEY` | Yes | Used to generate one-sentence memory summaries. |
 | `POSTGRES_URL` | Yes | Managed Postgres connection string. |
+| `SUPABASE_URL` | Yes | Backend Supabase project URL for token verification. |
+| `SUPABASE_ANON_KEY` | Yes | Backend anon key used with Supabase Auth. |
+| `VITE_SUPABASE_URL` | Yes | Frontend Supabase project URL. |
+| `VITE_SUPABASE_ANON_KEY` | Yes | Frontend anon key used by the browser client. |
 | `FRONTEND_URL` | Optional | Production URL, for CORS. |
 | `AI_SUMMARY_MODEL` | Optional | Defaults to `gpt-4o-mini`. |
 
-## 4. Verify
+## 5. Verify
 
 - `https://<your-domain>/api/health` returns `{"ok":true}`.
-- Create a memory in the app, then confirm it appears in the timeline.
+- Sign in with Google, create a memory, then confirm it appears in the timeline.
 
 ## Local Parity
 
 ```sh
 npm run setup
 cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env.local
 npm run dev:backend
 npm run dev:frontend
 ```

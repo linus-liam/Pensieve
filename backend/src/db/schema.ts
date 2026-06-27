@@ -9,6 +9,7 @@ export const schemaSql = `CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 CREATE TABLE IF NOT EXISTS memory_entries (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     UUID NOT NULL,
   raw_input   TEXT NOT NULL,
   ai_summary  TEXT NOT NULL,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -17,8 +18,25 @@ CREATE TABLE IF NOT EXISTS memory_entries (
   CONSTRAINT memory_entries_ai_summary_not_blank CHECK (length(trim(ai_summary)) > 0)
 );
 
+ALTER TABLE memory_entries
+  ADD COLUMN IF NOT EXISTS user_id UUID;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'memory_entries_user_id_required'
+  ) THEN
+    ALTER TABLE memory_entries
+      ADD CONSTRAINT memory_entries_user_id_required CHECK (user_id IS NOT NULL) NOT VALID;
+  END IF;
+END;
+$$;
+
 CREATE INDEX IF NOT EXISTS memory_entries_created_idx
   ON memory_entries(created_at DESC);
+
+CREATE INDEX IF NOT EXISTS memory_entries_user_created_idx
+  ON memory_entries(user_id, created_at DESC);
 
 CREATE OR REPLACE FUNCTION update_memory_entry_timestamp()
 RETURNS TRIGGER AS $$

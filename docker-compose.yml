@@ -80,6 +80,13 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile.dev
+    env_file:
+      - path: ./.env
+        required: false
+      - path: ./.env.local
+        required: false
+      - path: ./frontend/.env.local
+        required: false
     command: sh -c "npm ci && npm run dev -- --host"
     environment:
       BACKEND_URL: http://backend:3001

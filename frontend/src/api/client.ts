@@ -1,9 +1,14 @@
 import type { MemoryEntry } from "../types";
+import { getSupabaseAccessToken } from "../auth/supabaseClient";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const accessToken = await getSupabaseAccessToken();
+  if (!accessToken) throw new Error("Please sign in again.");
+
   const res = await fetch(`/api${path}`, {
     ...init,
     headers: {
+      Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
       ...init?.headers,
     },
