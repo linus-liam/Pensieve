@@ -9,7 +9,7 @@ interface AuthContextValue {
   session: Session | null;
   signingOut: boolean;
   user: User | null;
-  signInWithEmail: (email: string) => Promise<boolean>;
+  signInWithGoogle: () => Promise<boolean>;
   signOut: () => Promise<void>;
 }
 
@@ -61,7 +61,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     };
   }, []);
 
-  const signInWithEmail = useCallback(async (email: string) => {
+  const signInWithGoogle = useCallback(async () => {
     if (!supabase || !isSupabaseConfigured) {
       setError("Supabase auth is not configured.");
       return false;
@@ -69,10 +69,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     setError(null);
 
-    const { error: signInError } = await supabase.auth.signInWithOtp({
-      email,
+    const { error: signInError } = await supabase.auth.signInWithOAuth({
+      provider: "google",
       options: {
-        emailRedirectTo: window.location.origin,
+        redirectTo: window.location.origin,
       },
     });
 
@@ -108,10 +108,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       session,
       signingOut,
       user: session?.user ?? null,
-      signInWithEmail,
+      signInWithGoogle,
       signOut,
     }),
-    [error, loading, session, signInWithEmail, signOut, signingOut]
+    [error, loading, session, signInWithGoogle, signOut, signingOut]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

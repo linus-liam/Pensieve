@@ -7,7 +7,7 @@ import { AuthProvider } from "./auth/AuthProvider";
 const authMocks = vi.hoisted(() => ({
   getSession: vi.fn(),
   onAuthStateChange: vi.fn(),
-  signInWithOtp: vi.fn(),
+  signInWithOAuth: vi.fn(),
   signOut: vi.fn(),
   unsubscribe: vi.fn(),
 }));
@@ -17,7 +17,7 @@ vi.mock("@supabase/supabase-js", () => ({
     auth: {
       getSession: authMocks.getSession,
       onAuthStateChange: authMocks.onAuthStateChange,
-      signInWithOtp: authMocks.signInWithOtp,
+      signInWithOAuth: authMocks.signInWithOAuth,
       signOut: authMocks.signOut,
     },
   })),
@@ -74,9 +74,25 @@ describe("App memory flow", () => {
     authMocks.onAuthStateChange.mockReturnValue({
       data: { subscription: { unsubscribe: authMocks.unsubscribe } },
     });
-    authMocks.signInWithOtp.mockResolvedValue({ error: null });
+    authMocks.signInWithOAuth.mockResolvedValue({ error: null });
     authMocks.signOut.mockResolvedValue({ error: null });
     window.history.pushState(null, "", "/");
+  });
+
+  it("starts Google OAuth from the sign-in screen", async () => {
+    const user = userEvent.setup();
+    authMocks.getSession.mockResolvedValue({ data: { session: null }, error: null });
+
+    renderApp();
+
+    await user.click(await screen.findByRole("button", { name: "Continue with Google" }));
+
+    expect(authMocks.signInWithOAuth).toHaveBeenCalledWith({
+      provider: "google",
+      options: {
+        redirectTo: window.location.origin,
+      },
+    });
   });
 
   it("opens on the capture page with a focused composer and main navigation", async () => {

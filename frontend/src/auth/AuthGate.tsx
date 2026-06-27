@@ -6,10 +6,9 @@ import {
   Paper,
   Stack,
   Text,
-  TextInput,
   Title,
 } from "@mantine/core";
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { isSupabaseConfigured } from "./supabaseClient";
 import { useAuth } from "./AuthProvider";
 
@@ -18,19 +17,16 @@ interface AuthGateProps {
 }
 
 export function AuthGate({ children }: AuthGateProps) {
-  const { error, loading, session, signInWithEmail } = useAuth();
-  const [email, setEmail] = useState("");
-  const [emailSent, setEmailSent] = useState(false);
+  const { error, loading, session, signInWithGoogle } = useAuth();
   const [submitting, setSubmitting] = useState(false);
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function handleGoogleSignIn() {
     setSubmitting(true);
-
-    const ok = await signInWithEmail(email.trim());
-    if (ok) setEmailSent(true);
-
-    setSubmitting(false);
+    try {
+      await signInWithGoogle();
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   if (loading) {
@@ -81,28 +77,9 @@ export function AuthGate({ children }: AuthGateProps) {
               </Alert>
             ) : null}
 
-            {emailSent ? (
-              <Alert color="green" title="Check your email">
-                Open the sign-in link in the message from Supabase.
-              </Alert>
-            ) : null}
-
-            <form onSubmit={handleSubmit}>
-              <Stack gap="sm">
-                <TextInput
-                  autoComplete="email"
-                  label="Email"
-                  onChange={(event) => setEmail(event.currentTarget.value)}
-                  placeholder="you@example.com"
-                  required
-                  type="email"
-                  value={email}
-                />
-                <Button fullWidth loading={submitting} radius="sm" type="submit">
-                  Send sign-in link
-                </Button>
-              </Stack>
-            </form>
+            <Button fullWidth loading={submitting} radius="sm" onClick={handleGoogleSignIn}>
+              Continue with Google
+            </Button>
           </Stack>
         </Paper>
       </Center>

@@ -22,12 +22,8 @@ No separate migrate step is required on Vercel. The backend lazily creates the
 
 ## 3. Configure Auth
 
-In Supabase Auth, keep the Email provider enabled. Add your production Vercel
-URL to the allowed redirect URLs, for example `https://<your-domain>`.
-
-For production email delivery, deploy the Send Email Auth Hook in
-`supabase/README.md`. Supabase's built-in email sender is rate-limited and is
-not intended for production traffic.
+In Supabase Auth, enable the Google provider. Add your production Vercel URL to
+the allowed redirect URLs, for example `https://<your-domain>`.
 
 ## 4. Environment Variables
 
@@ -45,8 +41,7 @@ not intended for production traffic.
 ## 5. Verify
 
 - `https://<your-domain>/api/health` returns `{"ok":true}`.
-- Sign in with an email magic link, create a memory, then confirm it appears in
-  the timeline.
+- Sign in with Google, create a memory, then confirm it appears in the timeline.
 
 ## Local Parity
 
