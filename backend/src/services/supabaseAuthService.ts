@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { getEnvValue } from "../config/env.js";
 import { AppError } from "../errors.js";
 
 export interface AuthenticatedUser {
@@ -12,8 +13,8 @@ let supabaseAuthClient: SupabaseClient | null = null;
 function getSupabaseAuthClient() {
   if (supabaseAuthClient) return supabaseAuthClient;
 
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+  const supabaseUrl = getEnvValue("SUPABASE_URL");
+  const supabaseAnonKey = getEnvValue("SUPABASE_ANON_KEY");
 
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new AppError(500, "Supabase auth is not configured", "auth_not_configured");

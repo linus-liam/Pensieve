@@ -18,3 +18,23 @@ for (const path of envFiles) {
     dotenv.config({ path, override: false });
   }
 }
+
+export function getEnvValue(...keys: string[]): string | undefined {
+  for (const key of keys) {
+    const value = process.env[key]?.trim();
+    if (!value) continue;
+
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      const unquoted = value.slice(1, -1).trim();
+      if (unquoted) return unquoted;
+      continue;
+    }
+
+    return value;
+  }
+
+  return undefined;
+}
