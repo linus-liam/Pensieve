@@ -7,7 +7,7 @@ import { AuthProvider } from "./auth/AuthProvider";
 const authMocks = vi.hoisted(() => ({
   getSession: vi.fn(),
   onAuthStateChange: vi.fn(),
-  signInWithOAuth: vi.fn(),
+  signInWithOtp: vi.fn(),
   signOut: vi.fn(),
   unsubscribe: vi.fn(),
 }));
@@ -17,7 +17,7 @@ vi.mock("@supabase/supabase-js", () => ({
     auth: {
       getSession: authMocks.getSession,
       onAuthStateChange: authMocks.onAuthStateChange,
-      signInWithOAuth: authMocks.signInWithOAuth,
+      signInWithOtp: authMocks.signInWithOtp,
       signOut: authMocks.signOut,
     },
   })),
@@ -74,7 +74,7 @@ describe("App memory flow", () => {
     authMocks.onAuthStateChange.mockReturnValue({
       data: { subscription: { unsubscribe: authMocks.unsubscribe } },
     });
-    authMocks.signInWithOAuth.mockResolvedValue({ error: null });
+    authMocks.signInWithOtp.mockResolvedValue({ error: null });
     authMocks.signOut.mockResolvedValue({ error: null });
     window.history.pushState(null, "", "/");
   });

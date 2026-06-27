@@ -25,19 +25,24 @@ export function createApp() {
   );
   app.use(express.json({ limit: process.env.JSON_BODY_LIMIT ?? "8kb" }));
 
-  // Serverless (Vercel) has no migrate step; lazily ensure the schema exists.
-  app.use("/api", (_req, _res, next) => {
-    ensureSchema().then(() => next(), next);
-  });
+  function mountApi(prefix: "" | "/api") {
+    app.get(`${prefix}/health`, (_req, res) => res.json({ ok: true }));
 
-  app.get("/api/health", (_req, res) => res.json({ ok: true }));
+    // Serverless (Vercel) has no migrate step; lazily ensure the schema exists.
+    app.use(prefix, (_req, _res, next) => {
+      ensureSchema().then(() => next(), next);
+    });
 
-  app.use("/api", apiRateLimit);
-  app.use("/api/memory-entries", requireAuth, memoryEntriesRouter);
+    app.use(prefix, apiRateLimit);
+    app.use(`${prefix}/memory-entries`, requireAuth, memoryEntriesRouter);
 
-  app.use("/api", (_req, res) => {
-    res.status(404).json({ error: "not found", code: "not_found" });
-  });
+    app.use(prefix, (_req, res) => {
+      res.status(404).json({ error: "not found", code: "not_found" });
+    });
+  }
+
+  mountApi("/api");
+  mountApi("");
 
   app.use(errorHandler);
 
