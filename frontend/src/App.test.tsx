@@ -39,6 +39,11 @@ const updatedEntry = {
   updated_at: "2026-06-10T11:00:00.000Z",
 };
 
+const capturedFirstEntry = {
+  ...firstEntry,
+  acknowledgement: "It makes sense that writing the plan down helped things feel steadier.",
+};
+
 function jsonResponse(body: unknown, init?: ResponseInit) {
   return new Response(JSON.stringify(body), {
     status: 200,
@@ -102,10 +107,9 @@ describe("App memory flow", () => {
 
     expect(screen.queryByRole("banner")).not.toBeInTheDocument();
     expect(await screen.findByRole("button", { name: "Capture" })).toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", { name: "What do you want to put down?" })
-    ).toBeInTheDocument();
-    expect(screen.getByLabelText("What's on your mind?")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Capture" })).toBeInTheDocument();
+    expect(screen.getByText("I'm here. What feels worth remembering right now?")).toBeInTheDocument();
+    expect(screen.getByLabelText("Message to save as a memory")).toBeInTheDocument();
     expect(screen.getAllByRole("textbox")).toHaveLength(1);
     expect(screen.queryByRole("textbox", { name: /put down/i })).not.toBeInTheDocument();
     await waitFor(() => expect(fetch).toHaveBeenCalledWith("/api/memory-entries?limit=100", expect.any(Object)));
@@ -117,16 +121,16 @@ describe("App memory flow", () => {
       "fetch",
       vi.fn()
         .mockResolvedValueOnce(jsonResponse([]))
-        .mockResolvedValueOnce(jsonResponse(firstEntry, { status: 201 }))
+        .mockResolvedValueOnce(jsonResponse(capturedFirstEntry, { status: 201 }))
     );
 
     renderApp();
 
-    await user.type(await screen.findByLabelText("What's on your mind?"), firstEntry.raw_input);
-    await user.click(screen.getAllByRole("button", { name: "Save memory" })[0]);
+    await user.type(await screen.findByLabelText("Message to save as a memory"), firstEntry.raw_input);
+    await user.click(screen.getAllByRole("button", { name: "Send memory" })[0]);
 
-    expect(screen.getByRole("heading", { name: "What do you want to put down?" })).toBeInTheDocument();
-    expect(await screen.findByText("Saved to your memories")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Capture" })).toBeInTheDocument();
+    expect(await screen.findByText(capturedFirstEntry.acknowledgement)).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Memories" }));
     expect(await screen.findByText(firstEntry.ai_summary)).toBeInTheDocument();
@@ -180,15 +184,15 @@ describe("App memory flow", () => {
       "fetch",
       vi.fn()
         .mockResolvedValueOnce(jsonResponse([]))
-        .mockResolvedValueOnce(jsonResponse(firstEntry, { status: 201 }))
+        .mockResolvedValueOnce(jsonResponse(capturedFirstEntry, { status: 201 }))
     );
 
     renderApp();
 
-    await user.type(await screen.findByLabelText("What's on your mind?"), "A quiet thought");
+    await user.type(await screen.findByLabelText("Message to save as a memory"), "A quiet thought");
     await user.keyboard("{Control>}{Enter}{/Control}");
 
-    expect(await screen.findByText("Saved to your memories")).toBeInTheDocument();
+    expect(await screen.findByText(capturedFirstEntry.acknowledgement)).toBeInTheDocument();
   });
 
   it("updates the word count in the composer", async () => {
@@ -199,7 +203,7 @@ describe("App memory flow", () => {
 
     expect(await screen.findByText("0 words")).toBeInTheDocument();
 
-    await user.type(screen.getByLabelText("What's on your mind?"), "one two three");
+    await user.type(screen.getByLabelText("Message to save as a memory"), "one two three");
     expect(screen.getByText("3 words")).toBeInTheDocument();
   });
 

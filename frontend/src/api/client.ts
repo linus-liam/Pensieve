@@ -1,4 +1,4 @@
-import type { MemoryEntry } from "../types";
+import type { CapturedMemoryEntry, MemoryEntry } from "../types";
 import { getSupabaseAccessToken } from "../auth/supabaseClient";
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "/api";
@@ -31,7 +31,7 @@ export const api = {
   listMemoryEntries: () => request<MemoryEntry[]>("/memory-entries?limit=100"),
 
   createMemoryEntry: (rawInput: string) =>
-    request<MemoryEntry>("/memory-entries", {
+    request<CapturedMemoryEntry>("/memory-entries", {
       method: "POST",
       body: JSON.stringify({ rawInput }),
     }),

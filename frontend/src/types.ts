@@ -7,6 +7,10 @@ export interface MemoryEntry {
   updated_at: string;
 }
 
+export interface CapturedMemoryEntry extends MemoryEntry {
+  acknowledgement: string;
+}
+
 export type MemorySourceType = "text" | "screenshot" | "photo" | "voice";
 
 export interface Memory {

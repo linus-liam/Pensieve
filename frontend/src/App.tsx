@@ -15,10 +15,11 @@ import {
 import { api } from "./api/client";
 import { AuthGate } from "./auth/AuthGate";
 import { useAuth } from "./auth/AuthProvider";
-import { CaptureComposer } from "./components/reflection/CaptureComposer";
-import { CaptureDisplay } from "./components/reflection/CaptureDisplay";
+import {
+  CaptureComposer,
+  type CaptureChatMessage,
+} from "./components/reflection/CaptureComposer";
 import { MemoryDetail } from "./components/reflection/MemoryDetail";
-import { SaveConfirmation } from "./components/reflection/SaveConfirmation";
 import { SideNav } from "./components/reflection/SideNav";
 import { Timeline } from "./components/reflection/Timeline";
 import type { Memory, MemoryEntry } from "./types";
@@ -29,6 +30,18 @@ type NavPage = "capture" | "memories";
 interface RouteState {
   page: Page;
   selectedId: string | null;
+}
+
+const initialCaptureMessages: CaptureChatMessage[] = [
+  {
+    id: "capture-greeting",
+    role: "assistant",
+    content: "I'm here. What feels worth remembering right now?",
+  },
+];
+
+function createChatMessageId(prefix: string) {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
 function formatTime(value: string) {
@@ -132,13 +145,15 @@ function AuthenticatedApp() {
   const initialRoute = useMemo(getRouteFromHash, []);
   const [page, setPage] = useState<Page>(initialRoute.page);
   const [draft, setDraft] = useState("");
+  const [captureMessages, setCaptureMessages] = useState<CaptureChatMessage[]>(() => [
+    ...initialCaptureMessages,
+  ]);
   const [entries, setEntries] = useState<MemoryEntry[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(initialRoute.selectedId);
   const [detailDraft, setDetailDraft] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [updating, setUpdating] = useState(false);
-  const [showConfirmation, setShowConfirmation] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const hydratedDetailId = useRef<string | null>(null);
 
@@ -231,16 +246,42 @@ function AuthenticatedApp() {
     const rawInput = draft.trim();
     if (!rawInput || saving) return;
 
+    const userMessageId = createChatMessageId("user");
     setSaving(true);
     setError(null);
+    setDraft("");
+    setCaptureMessages((current) => [
+      ...current,
+      { id: userMessageId, role: "user", content: rawInput, status: "sending" },
+    ]);
 
     try {
       const entry = await api.createMemoryEntry(rawInput);
       setEntries((current) => [entry, ...current]);
-      setDraft("");
-      setShowConfirmation(true);
+      setCaptureMessages((current) => [
+        ...current.map((message) =>
+          message.id === userMessageId ? { ...message, status: undefined } : message
+        ),
+        {
+          id: `assistant-${entry.id}`,
+          role: "assistant",
+          content: entry.acknowledgement.trim() || "I hear you. I've saved this memory.",
+        },
+      ]);
     } catch (saveError) {
+      setDraft(rawInput);
       setError(saveError instanceof Error ? saveError.message : "Could not save memory");
+      setCaptureMessages((current) => [
+        ...current.map((message) =>
+          message.id === userMessageId ? { ...message, status: "error" as const } : message
+        ),
+        {
+          id: createChatMessageId("assistant-error"),
+          role: "assistant",
+          content: "I couldn't save that just now. Your words are still here.",
+          status: "error",
+        },
+      ]);
     } finally {
       setSaving(false);
     }
@@ -328,7 +369,6 @@ function AuthenticatedApp() {
 
               {page === "capture" ? (
                 <Stack gap="lg">
-                  <CaptureDisplay />
                   {error ? (
                     <Alert color="red" role="alert" title="Something went wrong">
                       {error}
@@ -336,6 +376,7 @@ function AuthenticatedApp() {
                   ) : null}
                   <CaptureComposer
                     canSave={canSave}
+                    messages={captureMessages}
                     saving={saving}
                     value={draft}
                     onChange={setDraft}
@@ -426,8 +467,6 @@ function AuthenticatedApp() {
           </Container>
         </AppShell.Main>
       </AppShell>
-
-      <SaveConfirmation show={showConfirmation} onDone={() => setShowConfirmation(false)} />
     </>
   );
 }

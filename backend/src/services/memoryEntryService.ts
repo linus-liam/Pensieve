@@ -1,7 +1,7 @@
 import { pool } from "../db/client.js";
 import { AppError } from "../errors.js";
-import { summarizeMemory } from "./aiService.js";
-import type { MemoryEntry } from "../types.js";
+import { acknowledgeMemory, summarizeMemory } from "./aiService.js";
+import type { CapturedMemoryEntry, MemoryEntry } from "../types.js";
 
 const DEFAULT_LIMIT = 50;
 
@@ -34,15 +34,22 @@ export async function getMemoryEntry(userId: string, id: string): Promise<Memory
   return entry;
 }
 
-export async function createMemoryEntry(userId: string, rawInput: string): Promise<MemoryEntry> {
-  const aiSummary = await summarizeMemory(rawInput);
+export async function createMemoryEntry(
+  userId: string,
+  rawInput: string
+): Promise<CapturedMemoryEntry> {
+  const [aiSummary, acknowledgement] = await Promise.all([
+    summarizeMemory(rawInput),
+    acknowledgeMemory(rawInput),
+  ]);
+
   const { rows } = await pool.query<MemoryEntry>(
     `INSERT INTO memory_entries (user_id, raw_input, ai_summary)
      VALUES ($1, $2, $3)
      RETURNING id, user_id, raw_input, ai_summary, created_at, updated_at`,
     [userId, rawInput, aiSummary]
   );
-  return rows[0];
+  return { ...rows[0], acknowledgement };
 }
 
 export async function updateMemoryEntry(

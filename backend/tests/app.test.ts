@@ -8,6 +8,7 @@ const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 const runDbTests = testDatabaseUrl ? describe : describe.skip;
 
 const aiMocks = vi.hoisted(() => ({
+  acknowledgeMemory: vi.fn(),
   summarizeMemory: vi.fn(),
 }));
 
@@ -50,7 +51,9 @@ runDbTests("memory entries API", () => {
   });
 
   beforeEach(async () => {
+    aiMocks.acknowledgeMemory.mockReset();
     aiMocks.summarizeMemory.mockReset();
+    aiMocks.acknowledgeMemory.mockResolvedValue("I hear how much that mattered.");
     authMocks.getUser.mockReset();
     authMocks.getUser.mockImplementation(async (token: string) => {
       if (token === userBToken) {
@@ -72,6 +75,7 @@ runDbTests("memory entries API", () => {
 
   it("saves raw input and AI summary", async () => {
     aiMocks.summarizeMemory.mockResolvedValue("A one sentence memory summary.");
+    aiMocks.acknowledgeMemory.mockResolvedValue("That sounds worth holding onto.");
 
     const response = await request(app)
       .post("/api/memory-entries")
@@ -82,6 +86,7 @@ runDbTests("memory entries API", () => {
     expect(response.body.user_id).toBe(userAId);
     expect(response.body.raw_input).toBe("I felt calmer after writing the plan down.");
     expect(response.body.ai_summary).toBe("A one sentence memory summary.");
+    expect(response.body.acknowledgement).toBe("That sounds worth holding onto.");
     expect(response.body.created_at).toBeTruthy();
     expect(response.body.updated_at).toBeTruthy();
   });
@@ -208,6 +213,25 @@ runDbTests("memory entries API", () => {
     expect(list.body).toHaveLength(0);
   });
 
+  it("does not persist a partial entry when AI acknowledgement fails", async () => {
+    aiMocks.summarizeMemory.mockResolvedValue("Summary before acknowledgement failure.");
+    aiMocks.acknowledgeMemory.mockRejectedValue(
+      new AppError(503, "AI provider unavailable", "ai_unavailable")
+    );
+
+    await request(app)
+      .post("/api/memory-entries")
+      .set("Authorization", `Bearer ${userAToken}`)
+      .send({ rawInput: "Please acknowledge later." })
+      .expect(503);
+
+    const list = await request(app)
+      .get("/api/memory-entries")
+      .set("Authorization", `Bearer ${userAToken}`)
+      .expect(200);
+    expect(list.body).toHaveLength(0);
+  });
+
   it("rejects oversized memory input before calling AI", async () => {
     await request(app)
       .post("/api/memory-entries")
@@ -216,6 +240,7 @@ runDbTests("memory entries API", () => {
       .expect(413);
 
     expect(aiMocks.summarizeMemory).not.toHaveBeenCalled();
+    expect(aiMocks.acknowledgeMemory).not.toHaveBeenCalled();
   });
 
   it("returns clean 400 JSON for invalid ids", async () => {
