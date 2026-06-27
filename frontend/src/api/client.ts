@@ -1,8 +1,7 @@
 import type { MemoryEntry } from "../types";
 import { getSupabaseAccessToken } from "../auth/supabaseClient";
 
-const apiBaseUrl =
-  import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.PROD ? "/_/backend/api" : "/api");
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "/api";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const accessToken = await getSupabaseAccessToken();

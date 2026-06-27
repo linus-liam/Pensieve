@@ -40,7 +40,7 @@ the allowed redirect URLs, for example `https://<your-domain>`.
 
 ## 5. Verify
 
-- `https://<your-domain>/_/backend/api/health` returns `{"ok":true}`.
+- `https://<your-domain>/api/health` returns `{"ok":true}`.
 - Sign in with Google, create a memory, then confirm it appears in the timeline.
 
 ## Local Parity
