@@ -1,11 +1,14 @@
 import type { MemoryEntry } from "../types";
 import { getSupabaseAccessToken } from "../auth/supabaseClient";
 
+const apiBaseUrl =
+  import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.PROD ? "/_/backend/api" : "/api");
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const accessToken = await getSupabaseAccessToken();
   if (!accessToken) throw new Error("Please sign in again.");
 
-  const res = await fetch(`/api${path}`, {
+  const res = await fetch(`${apiBaseUrl}${path}`, {
     ...init,
     headers: {
       Authorization: `Bearer ${accessToken}`,

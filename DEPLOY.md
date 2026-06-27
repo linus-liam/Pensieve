@@ -17,7 +17,7 @@ string. Supabase, Neon, or Vercel Postgres all work.
 For Supabase, use **Project Settings -> Database -> Connection string** and copy
 the pooled connection string.
 
-No separate migrate step is required on Vercel. The API lazily creates the
+No separate migrate step is required on Vercel. The backend lazily creates the
 `memory_entries` table on first request via `backend/src/db/schema.ts`.
 
 ## 3. Configure Auth
@@ -40,7 +40,7 @@ the allowed redirect URLs, for example `https://<your-domain>`.
 
 ## 5. Verify
 
-- `https://<your-domain>/api/health` returns `{"ok":true}`.
+- `https://<your-domain>/_/backend/api/health` returns `{"ok":true}`.
 - Sign in with Google, create a memory, then confirm it appears in the timeline.
 
 ## Local Parity

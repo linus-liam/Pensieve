@@ -70,6 +70,11 @@ runDbTests("memory entries API", () => {
     await pool.end();
   });
 
+  it("serves API routes through the Vercel backend service prefix", async () => {
+    const response = await request(app).get("/_/backend/api/health").expect(200);
+    expect(response.body.ok).toBe(true);
+  });
+
   it("saves raw input and AI summary", async () => {
     aiMocks.summarizeMemory.mockResolvedValue("A one sentence memory summary.");
 

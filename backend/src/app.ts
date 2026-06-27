@@ -16,6 +16,14 @@ export function createApp() {
   const app = express();
 
   app.set("trust proxy", 1);
+  app.use((req, _res, next) => {
+    if (req.url === "/_/backend") {
+      req.url = "/";
+    } else if (req.url.startsWith("/_/backend/")) {
+      req.url = req.url.slice("/_/backend".length);
+    }
+    next();
+  });
   app.use(helmet());
   app.use(
     cors({

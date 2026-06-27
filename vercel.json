@@ -1,14 +1,16 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "npm run vercel-build",
-  "installCommand": "npm ci",
-  "functions": {
-    "api/index.ts": {
+  "experimentalServices": {
+    "frontend": {
+      "entrypoint": "frontend",
+      "routePrefix": "/",
+      "framework": "vite"
+    },
+    "backend": {
+      "entrypoint": "backend",
+      "routePrefix": "/_/backend",
+      "framework": "express",
       "maxDuration": 60
     }
-  },
-  "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api" },
-    { "source": "/(.*)", "destination": "/index.html" }
-  ]
+  }
 }
