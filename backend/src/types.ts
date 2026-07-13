@@ -10,3 +10,40 @@ export interface MemoryEntry {
 export interface CapturedMemoryEntry extends MemoryEntry {
   acknowledgement: string;
 }
+
+export interface MemoryProposal {
+  title: string;
+  summary: string;
+  evidence: ProposalEvidence[];
+}
+
+export type ReflectionMessageRole = "assistant" | "user";
+
+export interface ReflectionChatMessage {
+  id?: string;
+  role: ReflectionMessageRole;
+  content: string;
+}
+
+export interface ReflectionAIMessage {
+  id: string;
+  role: ReflectionMessageRole;
+  content: string;
+}
+
+export interface ProposalEvidence {
+  userMessageId: string;
+  excerpt: string;
+}
+
+export type ReflectionTurnResponse =
+  | {
+      state: "exploring";
+      reply: string;
+      memoryProposal: null;
+    }
+  | {
+      state: "proposal_ready";
+      reply: string;
+      memoryProposal: MemoryProposal;
+    };
