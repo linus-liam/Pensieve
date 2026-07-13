@@ -180,10 +180,12 @@ const testSession = {
     id: firstEntry.user_id,
   },
 };
+const defaultAuthRedirectUrl = import.meta.env.VITE_AUTH_REDIRECT_URL ?? "";
 
 describe("App memory flow", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    vi.stubEnv("VITE_AUTH_REDIRECT_URL", defaultAuthRedirectUrl);
     authMocks.getSession.mockResolvedValue({ data: { session: testSession }, error: null });
     authMocks.onAuthStateChange.mockReturnValue({
       data: { subscription: { unsubscribe: authMocks.unsubscribe } },
@@ -193,8 +195,9 @@ describe("App memory flow", () => {
     window.history.pushState(null, "", "/");
   });
 
-  it("starts Google OAuth from the sign-in screen", async () => {
+  it("uses the current origin for Google OAuth when no redirect is configured", async () => {
     const user = userEvent.setup();
+    vi.stubEnv("VITE_AUTH_REDIRECT_URL", "");
     authMocks.getSession.mockResolvedValue({ data: { session: null }, error: null });
 
     renderApp();
@@ -204,7 +207,24 @@ describe("App memory flow", () => {
     expect(authMocks.signInWithOAuth).toHaveBeenCalledWith({
       provider: "google",
       options: {
-        redirectTo: import.meta.env.VITE_AUTH_REDIRECT_URL,
+        redirectTo: window.location.origin,
+      },
+    });
+  });
+
+  it("uses the configured Google OAuth redirect after trimming whitespace", async () => {
+    const user = userEvent.setup();
+    vi.stubEnv("VITE_AUTH_REDIRECT_URL", "  https://memories.example/auth/callback  ");
+    authMocks.getSession.mockResolvedValue({ data: { session: null }, error: null });
+
+    renderApp();
+
+    await user.click(await screen.findByRole("button", { name: "Continue with Google" }));
+
+    expect(authMocks.signInWithOAuth).toHaveBeenCalledWith({
+      provider: "google",
+      options: {
+        redirectTo: "https://memories.example/auth/callback",
       },
     });
   });
