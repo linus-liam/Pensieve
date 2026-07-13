@@ -9,6 +9,7 @@ const runDbTests = testDatabaseUrl ? describe : describe.skip;
 
 const aiMocks = vi.hoisted(() => ({
   acknowledgeMemory: vi.fn(),
+  continueReflection: vi.fn(),
   summarizeMemory: vi.fn(),
 }));
 
@@ -52,6 +53,7 @@ runDbTests("memory entries API", () => {
 
   beforeEach(async () => {
     aiMocks.acknowledgeMemory.mockReset();
+    aiMocks.continueReflection.mockReset();
     aiMocks.summarizeMemory.mockReset();
     aiMocks.acknowledgeMemory.mockResolvedValue("I hear how much that mattered.");
     authMocks.getUser.mockReset();
@@ -66,7 +68,7 @@ runDbTests("memory entries API", () => {
 
       return { data: { user: null }, error: new Error("Invalid token") };
     });
-    await pool.query("TRUNCATE memory_entries RESTART IDENTITY CASCADE");
+    await pool.query("TRUNCATE reflection_sessions, memory_entries RESTART IDENTITY CASCADE");
   });
 
   afterAll(async () => {
@@ -249,5 +251,152 @@ runDbTests("memory entries API", () => {
       .set("Authorization", `Bearer ${userAToken}`)
       .expect(400);
     expect(response.body.code).toBe("invalid_uuid");
+  });
+
+  it("creates and resumes one active reflection session", async () => {
+    const created = await request(app)
+      .post("/api/reflection-sessions")
+      .set("Authorization", `Bearer ${userAToken}`)
+      .expect(201);
+
+    expect(created.body.session).toMatchObject({
+      user_id: userAId,
+      status: "active",
+      title: "Untitled reflection",
+    });
+    expect(created.body.messages).toHaveLength(1);
+    expect(created.body.messages[0]).toMatchObject({
+      role: "assistant",
+      content: "I'm here. What feels worth remembering right now?",
+    });
+
+    const resumed = await request(app)
+      .get("/api/reflection-sessions/active")
+      .set("Authorization", `Bearer ${userAToken}`)
+      .expect(200);
+
+    expect(resumed.body.session.id).toBe(created.body.session.id);
+    expect(resumed.body.messages).toEqual(created.body.messages);
+  });
+
+  it("posts a reflection message idempotently and stores both turns", async () => {
+    aiMocks.continueReflection.mockResolvedValue({
+      state: "exploring",
+      reply: "What do you remember seeing when that happened?",
+      memoryProposal: null,
+    });
+    const created = await request(app)
+      .post("/api/reflection-sessions")
+      .set("Authorization", `Bearer ${userAToken}`)
+      .expect(201);
+    const body = {
+      clientMessageId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+      content: "Dad laughed when the tent fell down.",
+    };
+
+    const first = await request(app)
+      .post(`/api/reflection-sessions/${created.body.session.id}/messages`)
+      .set("Authorization", `Bearer ${userAToken}`)
+      .send(body)
+      .expect(201);
+
+    expect(first.body.replayed).toBe(false);
+    expect(first.body.userMessage).toMatchObject({
+      client_message_id: body.clientMessageId,
+      content: body.content,
+      role: "user",
+    });
+    expect(first.body.assistantMessage).toMatchObject({
+      content: "What do you remember seeing when that happened?",
+      role: "assistant",
+      metadata: { state: "exploring" },
+    });
+
+    const replay = await request(app)
+      .post(`/api/reflection-sessions/${created.body.session.id}/messages`)
+      .set("Authorization", `Bearer ${userAToken}`)
+      .send(body)
+      .expect(200);
+
+    expect(replay.body).toEqual({ ...first.body, replayed: true });
+    expect(aiMocks.continueReflection).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps a user message when AI fails and retries without duplicating it", async () => {
+    aiMocks.continueReflection
+      .mockRejectedValueOnce(new AppError(503, "AI provider unavailable", "ai_unavailable"))
+      .mockResolvedValueOnce({
+        state: "exploring",
+        reply: "What stood out most clearly?",
+        memoryProposal: null,
+      });
+    const created = await request(app)
+      .post("/api/reflection-sessions")
+      .set("Authorization", `Bearer ${userAToken}`)
+      .expect(201);
+    const path = `/api/reflection-sessions/${created.body.session.id}/messages`;
+    const body = {
+      clientMessageId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+      content: "I remember the room being very quiet.",
+    };
+
+    await request(app)
+      .post(path)
+      .set("Authorization", `Bearer ${userAToken}`)
+      .send(body)
+      .expect(503);
+
+    const afterFailure = await request(app)
+      .get(`/api/reflection-sessions/${created.body.session.id}`)
+      .set("Authorization", `Bearer ${userAToken}`)
+      .expect(200);
+    expect(afterFailure.body.messages.filter((message: { role: string }) => message.role === "user"))
+      .toHaveLength(1);
+
+    await request(app)
+      .post(path)
+      .set("Authorization", `Bearer ${userAToken}`)
+      .send(body)
+      .expect(201);
+
+    const afterRetry = await request(app)
+      .get(`/api/reflection-sessions/${created.body.session.id}`)
+      .set("Authorization", `Bearer ${userAToken}`)
+      .expect(200);
+    expect(afterRetry.body.messages.filter((message: { role: string }) => message.role === "user"))
+      .toHaveLength(1);
+    expect(afterRetry.body.messages.filter((message: { role: string }) => message.role === "assistant"))
+      .toHaveLength(2);
+  });
+
+  it("does not expose another user's reflection session", async () => {
+    const created = await request(app)
+      .post("/api/reflection-sessions")
+      .set("Authorization", `Bearer ${userAToken}`)
+      .expect(201);
+
+    await request(app)
+      .get(`/api/reflection-sessions/${created.body.session.id}`)
+      .set("Authorization", `Bearer ${userBToken}`)
+      .expect(404);
+
+    expect(aiMocks.continueReflection).not.toHaveBeenCalled();
+  });
+
+  it("upgrades an existing reflection message table missing idempotency columns", async () => {
+    await pool.query(
+      "ALTER TABLE reflection_messages DROP COLUMN client_message_id, DROP COLUMN reply_to_message_id"
+    );
+
+    await expect(pool.query(schemaSql)).resolves.toBeTruthy();
+
+    const columns = await pool.query<{ column_name: string }>(
+      `SELECT column_name
+       FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name = 'reflection_messages'`
+    );
+    expect(columns.rows.map((row) => row.column_name)).toEqual(
+      expect.arrayContaining(["client_message_id", "reply_to_message_id"])
+    );
   });
 });

@@ -17,11 +17,31 @@ async function ensureDbSchema() {
 }
 
 let memoryEntriesRouter: RequestHandler | null = null;
+let reflectionTurnsRouter: RequestHandler | null = null;
+let reflectionSessionsRouter: RequestHandler | null = null;
 
 const handleMemoryEntries: RequestHandler = async (req, res, next) => {
   try {
     memoryEntriesRouter ??= (await import("./routes/memoryEntries.js")).default;
     memoryEntriesRouter(req, res, next);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const handleReflectionTurns: RequestHandler = async (req, res, next) => {
+  try {
+    reflectionTurnsRouter ??= (await import("./routes/reflectionTurns.js")).default;
+    reflectionTurnsRouter(req, res, next);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const handleReflectionSessions: RequestHandler = async (req, res, next) => {
+  try {
+    reflectionSessionsRouter ??= (await import("./routes/reflectionSessions.js")).default;
+    reflectionSessionsRouter(req, res, next);
   } catch (error) {
     next(error);
   }
@@ -50,6 +70,8 @@ export function createApp() {
 
     app.use(prefix, apiRateLimit);
     app.use(`${prefix}/memory-entries`, requireAuth, handleMemoryEntries);
+    app.use(`${prefix}/reflection-turns`, requireAuth, handleReflectionTurns);
+    app.use(`${prefix}/reflection-sessions`, requireAuth, handleReflectionSessions);
 
     app.use(prefix, (_req, res) => {
       res.status(404).json({ error: "not found", code: "not_found" });
