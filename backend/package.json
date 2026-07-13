@@ -10,7 +10,8 @@
     "db:migrate:prod": "node dist/db/migrate.js",
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "eval:reflection": "tsx evals/runReflectionWorkflow.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.2",

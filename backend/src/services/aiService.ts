@@ -66,6 +66,12 @@ function questionCount(text: string): number {
   return text.match(/\?/g)?.length ?? 0;
 }
 
+function asksToPauseReflection(text: string): boolean {
+  return /\b(stop|pause|come back|return (?:to )?(?:this|it)(?: later)?|continue later|pick (?:this|it) up later|that(?:'s| is) all|nothing else to add)\b/i.test(
+    text
+  );
+}
+
 function normalizeReflectionMessages(messages: ReflectionChatMessage[]): ReflectionAIMessage[] {
   return messages.map((message, index) => ({
     id: message.id?.trim() || `transcript-${index + 1}`,
@@ -144,6 +150,21 @@ export function parseReflectionResponse(
     return { state: "exploring", reply, memoryProposal: null };
   }
 
+  if (candidate.state === "paused") {
+    const latestUserMessage = [...messages]
+      .reverse()
+      .find((message) => message.role === "user");
+    if (
+      candidate.memoryProposal !== null ||
+      questionCount(reply) !== 0 ||
+      !latestUserMessage ||
+      !asksToPauseReflection(latestUserMessage.content)
+    ) {
+      throw new Error("Invalid reflection response");
+    }
+    return { state: "paused", reply, memoryProposal: null };
+  }
+
   if (candidate.state !== "proposal_ready" || !candidate.memoryProposal) {
     throw new Error("Invalid reflection response");
   }
@@ -170,6 +191,12 @@ function parseReflectionAIOutput(
     return parseReflectionResponse(content, messages);
   } catch (error) {
     if (error instanceof AppError) throw error;
+    if (process.env.EVAL_DEBUG_AI === "1") {
+      console.error("Invalid reflection payload", {
+        content,
+        reason: error instanceof Error ? error.message : String(error),
+      });
+    }
     throw new AppError(503, "Invalid reflection response", "invalid_ai_response");
   }
 }
@@ -277,70 +304,87 @@ export async function continueReflection(
       content: `${message.id}: ${message.content}`,
     }))
   );
+  const systemPrompt =
+    "You are Pensieve, a memory-elicitation companion. Help the user get a memory or idea into their own words. While exploring, briefly acknowledge what they said and ask exactly one short, focused question about one missing detail: what happened, who was there, what they noticed, what happened before or after, how it felt, or why it matters. Prefer the user's vocabulary. Do not offer menus of answers, ask compound questions, diagnose, use clinical language, infer hidden motives, claim bodily or psychological mechanisms, or give advice unless explicitly asked. Never ask whether to save or turn something into a memory. Return paused only if the user's latest message explicitly asks to stop or pause, or explicitly directs you to return to this later; reply with a brief acknowledgement, no question, and memoryProposal null. Do not return paused merely because the user is uncertain, cannot recall a detail, or has not supplied a memory yet. There is no turn-count trigger. Return state proposal_ready only when the user has supplied (1) an identifiable event, experience, scene, or recurring pattern, (2) specific detail, (3) their own emotion, realization, meaning, or reason it matters, and (4) enough support to write a first-person summary without adding causes or conclusions. Uncertainty such as 'I don't know' or 'maybe' is a reason to keep exploring unless the rest of the transcript independently satisfies every criterion. A proposal must cite one to four byte-for-byte exact excerpts from user messages using the message ids in the transcript; do not change their spelling, punctuation, or quotation marks. Otherwise return exploring with memoryProposal null.";
 
-  const response = await withAIErrorHandling(() =>
-    getClient().chat.completions.create(
-      {
-        model: REFLECTION_MODEL,
-        ...getTokenLimitParam(REFLECTION_MODEL, 350),
-        temperature: 0.4,
-        response_format: {
-          type: "json_schema",
-          json_schema: {
-            name: "reflection_turn",
-            strict: true,
-            schema: {
-              type: "object",
-              additionalProperties: false,
-              properties: {
-                state: { type: "string", enum: ["exploring", "proposal_ready"] },
-                reply: { type: "string" },
-                memoryProposal: {
-                  anyOf: [
-                    { type: "null" },
-                    {
-                      type: "object",
-                      additionalProperties: false,
-                      properties: {
-                        title: { type: "string" },
-                        summary: { type: "string" },
-                        evidence: {
-                          type: "array",
-                          items: {
-                            type: "object",
-                            additionalProperties: false,
-                            properties: {
-                              userMessageId: { type: "string" },
-                              excerpt: { type: "string" },
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const response = await withAIErrorHandling(() =>
+      getClient().chat.completions.create(
+        {
+          model: REFLECTION_MODEL,
+          ...getTokenLimitParam(REFLECTION_MODEL, 350),
+          temperature: 0.4,
+          response_format: {
+            type: "json_schema",
+            json_schema: {
+              name: "reflection_turn",
+              strict: true,
+              schema: {
+                type: "object",
+                additionalProperties: false,
+                properties: {
+                  state: {
+                    type: "string",
+                    enum: ["exploring", "paused", "proposal_ready"],
+                  },
+                  reply: { type: "string" },
+                  memoryProposal: {
+                    anyOf: [
+                      { type: "null" },
+                      {
+                        type: "object",
+                        additionalProperties: false,
+                        properties: {
+                          title: { type: "string" },
+                          summary: { type: "string" },
+                          evidence: {
+                            type: "array",
+                            items: {
+                              type: "object",
+                              additionalProperties: false,
+                              properties: {
+                                userMessageId: { type: "string" },
+                                excerpt: { type: "string" },
+                              },
+                              required: ["userMessageId", "excerpt"],
                             },
-                            required: ["userMessageId", "excerpt"],
                           },
                         },
+                        required: ["title", "summary", "evidence"],
                       },
-                      required: ["title", "summary", "evidence"],
-                    },
-                  ],
+                    ],
+                  },
                 },
+                required: ["state", "reply", "memoryProposal"],
               },
-              required: ["state", "reply", "memoryProposal"],
             },
           },
+          messages: [
+            {
+              role: "system",
+              content:
+                attempt === 0
+                  ? systemPrompt
+                  : `${systemPrompt} Your previous output failed validation. Re-check the state rules, question count, and exact evidence excerpts before responding.`,
+            },
+            {
+              role: "user",
+              content: `Continue this reflection transcript. Each line begins with a message id:\n\n${safeTranscript}`,
+            },
+          ],
         },
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are Pensieve, a memory-elicitation companion. Help the user get a memory or idea into their own words. While exploring, briefly acknowledge what they said and ask exactly one short, focused question about one missing detail: what happened, who was there, what they noticed, what happened before or after, how it felt, or why it matters. Prefer the user's vocabulary. Do not offer menus of answers, ask compound questions, diagnose, use clinical language, infer hidden motives, claim bodily or psychological mechanisms, or give advice unless explicitly asked. Never ask whether to save or turn something into a memory. There is no turn-count trigger. Return state proposal_ready only when the user has supplied (1) an identifiable event, experience, scene, or recurring pattern, (2) specific detail, (3) their own emotion, realization, meaning, or reason it matters, and (4) enough support to write a first-person summary without adding causes or conclusions. Uncertainty such as 'I don't know' or 'maybe' is a reason to keep exploring unless the rest of the transcript independently satisfies every criterion. A proposal must cite one to four exact excerpts from user messages using the message ids in the transcript. Otherwise return exploring with memoryProposal null.",
-          },
-          {
-            role: "user",
-            content: `Continue this reflection transcript. Each line begins with a message id:\n\n${safeTranscript}`,
-          },
-        ],
-      },
-      { timeout: AI_TIMEOUT_MS }
-    )
-  );
+        { timeout: AI_TIMEOUT_MS }
+      )
+    );
 
-  return parseReflectionAIOutput(response.choices[0]?.message?.content, normalizedMessages);
+    try {
+      return parseReflectionAIOutput(response.choices[0]?.message?.content, normalizedMessages);
+    } catch (error) {
+      if (!(error instanceof AppError) || error.code !== "invalid_ai_response" || attempt === 1) {
+        throw error;
+      }
+    }
+  }
+
+  throw new AppError(503, "Invalid reflection response", "invalid_ai_response");
 }

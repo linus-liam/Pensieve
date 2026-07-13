@@ -112,17 +112,22 @@ describe("aiService reflection turns", () => {
     ]);
 
     const [payload] = openAIMocks.createCompletion.mock.calls[0] ?? [];
+    const systemMessage = payload.messages.find(
+      (message: { role: string }) => message.role === "system"
+    )?.content;
     expect(payload.model).toBe("gpt-5.4-mini");
     expect(payload.response_format).toMatchObject({
       type: "json_schema",
       json_schema: { name: "reflection_turn", strict: true },
     });
+    expect(systemMessage).toMatch(/explicitly (asks|directs).*(stop|pause)/i);
+    expect(systemMessage).toMatch(/do not return paused merely because.*uncertain/i);
   });
 
   it.each(["Tell me more.", "Who was there? What happened next?"])(
     "rejects exploring reply with an invalid question count: %s",
     async (reply) => {
-      openAIMocks.createCompletion.mockResolvedValueOnce(
+      openAIMocks.createCompletion.mockResolvedValue(
         completion({ state: "exploring", reply, memoryProposal: null })
       );
       const { continueReflection } = await import("../src/services/aiService.js");
@@ -132,6 +137,79 @@ describe("aiService reflection turns", () => {
       ).rejects.toMatchObject({ code: "invalid_ai_response" });
     }
   );
+
+  it("accepts a question-free paused reply when the user wants to stop", async () => {
+    openAIMocks.createCompletion.mockResolvedValue(
+      completion({
+        state: "paused",
+        reply: "Understood — we can pause here.",
+        memoryProposal: null,
+      })
+    );
+    const { continueReflection } = await import("../src/services/aiService.js");
+
+    await expect(
+      continueReflection([
+        {
+          id: "user-1",
+          role: "user",
+          content: "I think I need to come back to this later.",
+        },
+      ])
+    ).resolves.toEqual({
+      state: "paused",
+      reply: "Understood — we can pause here.",
+      memoryProposal: null,
+    });
+  });
+
+  it("retries once when structured output fails semantic validation", async () => {
+    openAIMocks.createCompletion
+      .mockResolvedValueOnce(
+        completion({
+          state: "exploring",
+          reply: "I am listening.",
+          memoryProposal: null,
+        })
+      )
+      .mockResolvedValueOnce(
+        completion({
+          state: "exploring",
+          reply: "What happened just before that?",
+          memoryProposal: null,
+        })
+      );
+    const { continueReflection } = await import("../src/services/aiService.js");
+
+    await expect(
+      continueReflection([{ id: "user-1", role: "user", content: "I feel off." }])
+    ).resolves.toMatchObject({
+      state: "exploring",
+      reply: "What happened just before that?",
+    });
+    expect(openAIMocks.createCompletion).toHaveBeenCalledTimes(2);
+  });
+
+  it("rejects paused output when the user did not ask to pause", async () => {
+    openAIMocks.createCompletion.mockResolvedValue(
+      completion({
+        state: "paused",
+        reply: "We can leave it there for now.",
+        memoryProposal: null,
+      })
+    );
+    const { continueReflection } = await import("../src/services/aiService.js");
+
+    await expect(
+      continueReflection([
+        {
+          id: "user-1",
+          role: "user",
+          content: "No, I cannot think of a specific example.",
+        },
+      ])
+    ).rejects.toMatchObject({ code: "invalid_ai_response" });
+  });
 
   it("accepts a grounded memory proposal without a turn-count trigger", async () => {
     openAIMocks.createCompletion.mockResolvedValueOnce(
@@ -177,7 +255,7 @@ describe("aiService reflection turns", () => {
   });
 
   it("rejects proposal evidence that is not in the referenced user message", async () => {
-    openAIMocks.createCompletion.mockResolvedValueOnce(
+    openAIMocks.createCompletion.mockResolvedValue(
       completion({
         state: "proposal_ready",
         reply: "That sounds worth holding onto.",

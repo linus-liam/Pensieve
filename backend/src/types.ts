@@ -32,7 +32,7 @@ export interface ReflectionSession {
 }
 
 export interface ReflectionMessageMetadata {
-  state?: "exploring" | "proposal_ready";
+  state?: "exploring" | "paused" | "proposal_ready";
   memoryProposal?: MemoryProposal;
   proposalState?: "pending" | "dismissed" | "saved";
   memoryEntryId?: string;
@@ -75,6 +75,11 @@ export interface ProposalEvidence {
 export type ReflectionTurnResponse =
   | {
       state: "exploring";
+      reply: string;
+      memoryProposal: null;
+    }
+  | {
+      state: "paused";
       reply: string;
       memoryProposal: null;
     }

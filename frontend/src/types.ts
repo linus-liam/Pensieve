@@ -38,7 +38,7 @@ export interface ReflectionSession {
 }
 
 export interface ReflectionMessageMetadata {
-  state?: "exploring" | "proposal_ready";
+  state?: "exploring" | "paused" | "proposal_ready";
   memoryProposal?: MemoryProposal;
   proposalState?: "pending" | "dismissed" | "saved";
   memoryEntryId?: string;
