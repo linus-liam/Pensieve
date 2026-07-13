@@ -11,7 +11,7 @@ export async function listMemoryEntries(
   offset = 0
 ): Promise<MemoryEntry[]> {
   const { rows } = await pool.query<MemoryEntry>(
-    `SELECT id, user_id, raw_input, ai_summary, created_at, updated_at
+    `SELECT id, user_id, session_id, title, raw_input, ai_summary, created_at, updated_at
      FROM memory_entries
      WHERE user_id = $1
      ORDER BY created_at DESC
@@ -23,7 +23,7 @@ export async function listMemoryEntries(
 
 export async function getMemoryEntry(userId: string, id: string): Promise<MemoryEntry> {
   const { rows } = await pool.query<MemoryEntry>(
-    `SELECT id, user_id, raw_input, ai_summary, created_at, updated_at
+    `SELECT id, user_id, session_id, title, raw_input, ai_summary, created_at, updated_at
      FROM memory_entries
      WHERE id = $1 AND user_id = $2`,
     [id, userId]
@@ -44,10 +44,10 @@ export async function createMemoryEntry(
   ]);
 
   const { rows } = await pool.query<MemoryEntry>(
-    `INSERT INTO memory_entries (user_id, raw_input, ai_summary)
-     VALUES ($1, $2, $3)
-     RETURNING id, user_id, raw_input, ai_summary, created_at, updated_at`,
-    [userId, rawInput, aiSummary]
+    `INSERT INTO memory_entries (user_id, title, raw_input, ai_summary)
+     VALUES ($1, $2, $3, $2)
+     RETURNING id, user_id, session_id, title, raw_input, ai_summary, created_at, updated_at`,
+    [userId, aiSummary, rawInput]
   );
   return { ...rows[0], acknowledgement };
 }
@@ -64,7 +64,7 @@ export async function updateMemoryEntry(
     `UPDATE memory_entries
      SET raw_input = $1, ai_summary = $2
      WHERE id = $3 AND user_id = $4
-     RETURNING id, user_id, raw_input, ai_summary, created_at, updated_at`,
+     RETURNING id, user_id, session_id, title, raw_input, ai_summary, created_at, updated_at`,
     [rawInput, aiSummary, id, userId]
   );
 

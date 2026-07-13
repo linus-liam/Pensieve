@@ -4,6 +4,7 @@ import { AppError } from "../errors.js";
 import { asyncHandler } from "../middleware/asyncHandler.js";
 import {
   appendReflectionMessage,
+  confirmReflectionMemory,
   createReflectionSession,
   getActiveReflectionSession,
   getReflectionSession,
@@ -12,6 +13,8 @@ import { requireText, requireUuid } from "../utils/validation.js";
 
 const router = Router();
 const MAX_MESSAGE_CHARS = Number(process.env.MEMORY_RAW_INPUT_MAX_CHARS ?? 2000);
+const MAX_MEMORY_TITLE_CHARS = 120;
+const MAX_MEMORY_SUMMARY_CHARS = 600;
 
 function requireAuthUserId(req: Request) {
   const userId = req.authUser?.id;
@@ -38,6 +41,20 @@ router.post(
       content: requireText(req.body?.content, "content", MAX_MESSAGE_CHARS),
     });
     res.status(result.replayed ? 200 : 201).json(result);
+  })
+);
+
+router.post(
+  "/:id/memory",
+  asyncHandler(async (req, res) => {
+    const entry = await confirmReflectionMemory({
+      userId: requireAuthUserId(req),
+      sessionId: requireUuid(req.params.id, "id"),
+      assistantMessageId: requireUuid(req.body?.assistantMessageId, "assistantMessageId"),
+      title: requireText(req.body?.title, "title", MAX_MEMORY_TITLE_CHARS),
+      summary: requireText(req.body?.summary, "summary", MAX_MEMORY_SUMMARY_CHARS),
+    });
+    res.status(201).json(entry);
   })
 );
 

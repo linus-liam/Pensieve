@@ -1,6 +1,8 @@
 export interface MemoryEntry {
   id: string;
   user_id: string;
+  session_id: string | null;
+  title: string;
   raw_input: string;
   ai_summary: string;
   created_at: string;

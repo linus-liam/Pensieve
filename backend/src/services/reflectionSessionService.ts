@@ -3,6 +3,7 @@ import { pool } from "../db/client.js";
 import { AppError } from "../errors.js";
 import { continueReflection } from "./aiService.js";
 import type {
+  MemoryEntry,
   ReflectionMessage,
   ReflectionSession,
   ReflectionSessionDetail,
@@ -196,4 +197,86 @@ export async function appendReflectionMessage(input: {
   );
 
   return { userMessage, assistantMessage: assistantResult.rows[0], replayed: false };
+}
+
+export async function confirmReflectionMemory(input: {
+  userId: string;
+  sessionId: string;
+  assistantMessageId: string;
+  title: string;
+  summary: string;
+}): Promise<MemoryEntry> {
+  const { userId, sessionId, assistantMessageId, title, summary } = input;
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const sessionResult = await client.query<ReflectionSession>(
+      `SELECT ${sessionColumns}
+       FROM reflection_sessions
+       WHERE id = $1 AND user_id = $2
+       FOR UPDATE`,
+      [sessionId, userId]
+    );
+    if (!sessionResult.rows[0]) {
+      throw new AppError(404, "reflection session not found", "not_found");
+    }
+
+    const messageResult = await client.query<ReflectionMessage>(
+      `SELECT ${messageColumns}
+       FROM reflection_messages
+       WHERE id = $1 AND session_id = $2 AND user_id = $3 AND role = 'assistant'
+       FOR UPDATE`,
+      [assistantMessageId, sessionId, userId]
+    );
+    const assistantMessage = messageResult.rows[0];
+    if (
+      !assistantMessage ||
+      assistantMessage.metadata.state !== "proposal_ready" ||
+      !assistantMessage.metadata.memoryProposal
+    ) {
+      throw new AppError(400, "assistant message has no memory proposal", "invalid_proposal");
+    }
+    if (assistantMessage.metadata.proposalState !== "pending") {
+      throw new AppError(409, "memory proposal has already been handled", "proposal_handled");
+    }
+    if (sessionResult.rows[0].status !== "active") {
+      throw new AppError(409, "reflection session is already completed", "session_completed");
+    }
+
+    const transcriptMessages = await loadMessages(client, userId, sessionId);
+    const rawInput = transcriptMessages
+      .filter((message) => message.role === "user")
+      .map((message) => message.content)
+      .join("\n\n");
+    const entryResult = await client.query<MemoryEntry>(
+      `INSERT INTO memory_entries (user_id, session_id, title, raw_input, ai_summary)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, user_id, session_id, title, raw_input, ai_summary, created_at, updated_at`,
+      [userId, sessionId, title, rawInput, summary]
+    );
+    const entry = entryResult.rows[0];
+
+    await client.query(
+      `UPDATE reflection_messages
+       SET metadata = metadata || jsonb_build_object(
+         'proposalState', 'saved',
+         'memoryEntryId', $1::text
+       )
+       WHERE id = $2 AND session_id = $3 AND user_id = $4`,
+      [entry.id, assistantMessageId, sessionId, userId]
+    );
+    await client.query(
+      `UPDATE reflection_sessions
+       SET status = 'completed', title = $1, updated_at = NOW()
+       WHERE id = $2 AND user_id = $3`,
+      [title, sessionId, userId]
+    );
+    await client.query("COMMIT");
+    return entry;
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
 }

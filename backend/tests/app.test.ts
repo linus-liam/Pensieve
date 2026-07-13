@@ -399,4 +399,76 @@ runDbTests("memory entries API", () => {
       expect.arrayContaining(["client_message_id", "reply_to_message_id"])
     );
   });
+
+  it("saves the approved proposal exactly without another AI call", async () => {
+    aiMocks.continueReflection.mockImplementationOnce(
+      async (messages: Array<{ id: string; role: string; content: string }>) => {
+        const userMessage = [...messages].reverse().find((message) => message.role === "user");
+        return {
+          state: "proposal_ready",
+          reply: "That feels like a memory worth holding onto.",
+          memoryProposal: {
+            title: "The Collapsed Tent",
+            summary: "I remember Dad laughing when our tent collapsed.",
+            evidence: [
+              {
+                userMessageId: userMessage?.id,
+                excerpt: "Dad laughed when our tent collapsed",
+              },
+            ],
+          },
+        };
+      }
+    );
+    const created = await request(app)
+      .post("/api/reflection-sessions")
+      .set("Authorization", `Bearer ${userAToken}`)
+      .expect(201);
+    const turn = await request(app)
+      .post(`/api/reflection-sessions/${created.body.session.id}/messages`)
+      .set("Authorization", `Bearer ${userAToken}`)
+      .send({
+        clientMessageId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+        content: "Dad laughed when our tent collapsed, and I felt completely safe.",
+      })
+      .expect(201);
+
+    const saved = await request(app)
+      .post(`/api/reflection-sessions/${created.body.session.id}/memory`)
+      .set("Authorization", `Bearer ${userAToken}`)
+      .send({
+        assistantMessageId: turn.body.assistantMessage.id,
+        title: "Camping with Dad",
+        summary: "I remember Dad laughing when our tent collapsed.",
+      })
+      .expect(201);
+
+    expect(saved.body).toMatchObject({
+      user_id: userAId,
+      session_id: created.body.session.id,
+      title: "Camping with Dad",
+      ai_summary: "I remember Dad laughing when our tent collapsed.",
+    });
+    expect(saved.body.raw_input).toContain("Dad laughed when our tent collapsed");
+    expect(aiMocks.continueReflection).toHaveBeenCalledTimes(1);
+    expect(aiMocks.summarizeMemory).not.toHaveBeenCalled();
+    expect(aiMocks.acknowledgeMemory).not.toHaveBeenCalled();
+
+    const detail = await request(app)
+      .get(`/api/reflection-sessions/${created.body.session.id}`)
+      .set("Authorization", `Bearer ${userAToken}`)
+      .expect(200);
+    expect(detail.body.session.status).toBe("completed");
+
+    const duplicate = await request(app)
+      .post(`/api/reflection-sessions/${created.body.session.id}/memory`)
+      .set("Authorization", `Bearer ${userAToken}`)
+      .send({
+        assistantMessageId: turn.body.assistantMessage.id,
+        title: "Camping with Dad",
+        summary: "I remember Dad laughing when our tent collapsed.",
+      })
+      .expect(409);
+    expect(duplicate.body.code).toBe("proposal_handled");
+  });
 });
