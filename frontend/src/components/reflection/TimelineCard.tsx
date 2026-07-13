@@ -1,4 +1,4 @@
-import { Card, Group, Image, Stack, Text } from "@mantine/core";
+import { Card, Group, Image, Stack, Text, Title } from "@mantine/core";
 import type { Memory } from "../../types";
 import { MemoryTag } from "./MemoryTag";
 import { SourceBadge } from "./SourceBadge";
@@ -14,7 +14,7 @@ export function TimelineCard({ memory, muted = false, onOpen }: TimelineCardProp
     <Card
       component="a"
       href={`#memory/${encodeURIComponent(memory.id)}`}
-      aria-label={`Open memory: ${memory.summary} ${memory.time}`}
+      aria-label={`Open memory: ${memory.title} ${memory.time}`}
       className="timeline-card"
       opacity={muted ? 0.78 : 1}
       p="md"
@@ -40,7 +40,12 @@ export function TimelineCard({ memory, muted = false, onOpen }: TimelineCardProp
           <Image alt={memory.imageAlt ?? ""} radius="sm" src={memory.image} />
         ) : null}
 
-        <Text>{memory.summary}</Text>
+        <Stack gap={4}>
+          <Title order={3} size="h4">
+            {memory.title}
+          </Title>
+          <Text>{memory.summary}</Text>
+        </Stack>
 
         <Group aria-label="Memory tags" gap="xs">
           {memory.tags.map((tag) => (

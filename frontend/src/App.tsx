@@ -11,7 +11,7 @@ import {
   Stack,
   Title,
 } from "@mantine/core";
-import { api } from "./api/client";
+import { api, ApiError } from "./api/client";
 import { AuthGate } from "./auth/AuthGate";
 import { useAuth } from "./auth/AuthProvider";
 import {
@@ -22,7 +22,13 @@ import { MemoryDetail } from "./components/reflection/MemoryDetail";
 import { MobileBottomNav } from "./components/reflection/MobileBottomNav";
 import { SideNav } from "./components/reflection/SideNav";
 import { Timeline } from "./components/reflection/Timeline";
-import type { Memory, MemoryEntry } from "./types";
+import type {
+  Memory,
+  MemoryEntry,
+  MemoryProposal,
+  ReflectionMessage,
+  ReflectionSession,
+} from "./types";
 
 type Page = "capture" | "memories" | "detail";
 type NavPage = "capture" | "memories";
@@ -39,11 +45,6 @@ const initialCaptureMessages: CaptureChatMessage[] = [
     content: "I'm here. What feels worth remembering right now?",
   },
 ];
-
-function createChatMessageId(prefix: string) {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-}
-
 function formatTime(value: string) {
   return new Intl.DateTimeFormat("en-US", {
     hour: "numeric",
@@ -86,6 +87,8 @@ function inferTags(content: string) {
 function toMemory(entry: MemoryEntry): Memory {
   return {
     id: entry.id,
+    sessionId: entry.session_id ?? null,
+    title: entry.title || entry.ai_summary,
     day: getDayLabel(entry.created_at),
     time: formatTime(entry.created_at),
     source: "Text",
@@ -93,6 +96,24 @@ function toMemory(entry: MemoryEntry): Memory {
     summary: entry.ai_summary,
     rawInput: entry.raw_input,
     tags: inferTags(entry.raw_input),
+  };
+}
+
+function toCaptureMessage(message: ReflectionMessage): CaptureChatMessage {
+  const proposal = message.metadata.memoryProposal;
+  return {
+    id: message.id,
+    clientMessageId: message.client_message_id ?? undefined,
+    role: message.role,
+    content: message.content,
+    proposal,
+    proposalStatus: proposal
+      ? message.metadata.proposalState === "saved"
+        ? "saved"
+        : message.metadata.proposalState === "dismissed"
+          ? "dismissed"
+          : "pending"
+      : undefined,
   };
 }
 
@@ -130,10 +151,17 @@ function AuthenticatedApp() {
   const [captureMessages, setCaptureMessages] = useState<CaptureChatMessage[]>(() => [
     ...initialCaptureMessages,
   ]);
+  const [reflectionSession, setReflectionSession] = useState<ReflectionSession | null>(null);
+  const [retryMessage, setRetryMessage] = useState<{
+    clientMessageId: string;
+    content: string;
+  } | null>(null);
   const [entries, setEntries] = useState<MemoryEntry[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(initialRoute.selectedId);
   const [detailDraft, setDetailDraft] = useState("");
+  const [detailTranscript, setDetailTranscript] = useState<ReflectionMessage[] | null>(null);
   const [loading, setLoading] = useState(true);
+  const [proposalSavingId, setProposalSavingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -156,6 +184,35 @@ function AuthenticatedApp() {
   useEffect(() => {
     void loadEntries();
   }, [loadEntries]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadSession = async () => {
+      try {
+        let detail;
+        try {
+          detail = await api.getActiveReflectionSession();
+        } catch (sessionError) {
+          if (!(sessionError instanceof ApiError) || sessionError.status !== 404) throw sessionError;
+          detail = await api.createReflectionSession();
+        }
+        if (cancelled) return;
+        setReflectionSession(detail.session);
+        setCaptureMessages(detail.messages.map(toCaptureMessage));
+      } catch (sessionError) {
+        if (cancelled) return;
+        setError(
+          sessionError instanceof Error ? sessionError.message : "Could not load reflection"
+        );
+      }
+    };
+
+    void loadSession();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const memories = useMemo(() => entries.map(toMemory), [entries]);
   const selectedEntry = entries.find((entry) => entry.id === selectedId) ?? null;
@@ -197,6 +254,32 @@ function AuthenticatedApp() {
     hydratedDetailId.current = selectedEntry.id;
   }, [page, selectedEntry]);
 
+  useEffect(() => {
+    if (page !== "detail" || !selectedEntry?.session_id) {
+      setDetailTranscript(null);
+      return;
+    }
+
+    let cancelled = false;
+    setDetailTranscript(null);
+    api.getReflectionSession(selectedEntry.session_id)
+      .then((detail) => {
+        if (!cancelled) setDetailTranscript(detail.messages);
+      })
+      .catch((transcriptError) => {
+        if (!cancelled) {
+          setError(
+            transcriptError instanceof Error
+              ? transcriptError.message
+              : "Could not load source conversation"
+          );
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [page, selectedEntry?.session_id]);
+
   const navigate = useCallback(
     (nextPage: Page, memoryId?: string) => {
       const nextSelectedId = nextPage === "detail" ? memoryId ?? selectedId : null;
@@ -225,50 +308,120 @@ function AuthenticatedApp() {
     [navigate]
   );
 
-  const saveMemory = useCallback(async () => {
+  const sendReflectionMessage = useCallback(async () => {
     const rawInput = draft.trim();
-    if (!rawInput || saving) return;
+    if (!rawInput || saving || !reflectionSession) return;
 
-    const userMessageId = createChatMessageId("user");
+    const clientMessageId =
+      retryMessage?.content === rawInput ? retryMessage.clientMessageId : crypto.randomUUID();
+    const userMessageId = `pending-${clientMessageId}`;
+    const userMessage: CaptureChatMessage = {
+      id: userMessageId,
+      clientMessageId,
+      role: "user",
+      content: rawInput,
+      status: "sending",
+    };
     setSaving(true);
     setError(null);
     setDraft("");
     setCaptureMessages((current) => [
-      ...current,
-      { id: userMessageId, role: "user", content: rawInput, status: "sending" },
+      ...current.filter(
+        (message) =>
+          message.clientMessageId !== clientMessageId &&
+          message.id !== `assistant-error-${clientMessageId}`
+      ),
+      userMessage,
     ]);
 
     try {
-      const entry = await api.createMemoryEntry(rawInput);
-      setEntries((current) => [entry, ...current]);
+      const reflection = await api.sendReflectionMessage(
+        reflectionSession.id,
+        rawInput,
+        clientMessageId
+      );
       setCaptureMessages((current) => [
-        ...current.map((message) =>
-          message.id === userMessageId ? { ...message, status: undefined } : message
-        ),
-        {
-          id: `assistant-${entry.id}`,
-          role: "assistant",
-          content: entry.acknowledgement.trim() || "I hear you. I've saved this memory.",
-        },
+        ...current
+          .filter(
+            (message) =>
+              message.id !== userMessageId &&
+              message.clientMessageId !== clientMessageId &&
+              message.id !== `assistant-error-${clientMessageId}`
+          )
+          .concat(toCaptureMessage(reflection.userMessage)),
+        toCaptureMessage(reflection.assistantMessage),
       ]);
+      setRetryMessage(null);
     } catch (saveError) {
       setDraft(rawInput);
-      setError(saveError instanceof Error ? saveError.message : "Could not save memory");
+      setError(
+        saveError instanceof Error ? saveError.message : "Could not continue reflection"
+      );
+      setRetryMessage({ clientMessageId, content: rawInput });
       setCaptureMessages((current) => [
         ...current.map((message) =>
           message.id === userMessageId ? { ...message, status: "error" as const } : message
         ),
         {
-          id: createChatMessageId("assistant-error"),
+          id: `assistant-error-${clientMessageId}`,
           role: "assistant",
-          content: "I couldn't save that just now. Your words are still here.",
+          content: "I couldn't send that just now. Your words are still here.",
           status: "error",
         },
       ]);
     } finally {
       setSaving(false);
     }
-  }, [draft, saving]);
+  }, [draft, reflectionSession, retryMessage, saving]);
+
+  const dismissProposal = useCallback((messageId: string) => {
+    setCaptureMessages((current) =>
+      current.map((message) =>
+        message.id === messageId ? { ...message, proposalStatus: "dismissed" as const } : message
+      )
+    );
+  }, []);
+
+  const changeProposal = useCallback((messageId: string, proposal: MemoryProposal) => {
+    setCaptureMessages((current) =>
+      current.map((message) => (message.id === messageId ? { ...message, proposal } : message))
+    );
+  }, []);
+
+  const saveProposal = useCallback(
+    async (messageId: string) => {
+      if (proposalSavingId) return;
+
+      const proposalMessage = captureMessages.find((message) => message.id === messageId);
+      const proposal = proposalMessage?.proposal;
+      if (!proposal) return;
+
+      setProposalSavingId(messageId);
+      setError(null);
+
+      try {
+        if (!reflectionSession) return;
+        const entry = await api.confirmReflectionMemory(reflectionSession.id, {
+          assistantMessageId: messageId,
+          title: proposal.title,
+          summary: proposal.summary,
+        });
+        setEntries((current) => [entry, ...current]);
+        setCaptureMessages((current) =>
+          current.map((message) =>
+            message.id === messageId
+              ? { ...message, proposalStatus: "saved" as const }
+              : message
+          )
+        );
+      } catch (saveError) {
+        setError(saveError instanceof Error ? saveError.message : "Could not save reflection");
+      } finally {
+        setProposalSavingId(null);
+      }
+    },
+    [captureMessages, proposalSavingId, reflectionSession]
+  );
 
   const openMemory = useCallback((memory: Memory) => {
     setSelectedId(memory.id);
@@ -358,10 +511,14 @@ function AuthenticatedApp() {
                   <CaptureComposer
                     canSave={canSave}
                     messages={captureMessages}
+                    proposalSavingId={proposalSavingId}
                     saving={saving}
                     value={draft}
                     onChange={setDraft}
-                    onSave={saveMemory}
+                    onChangeProposal={changeProposal}
+                    onDismissProposal={dismissProposal}
+                    onSave={sendReflectionMessage}
+                    onSaveProposal={saveProposal}
                   />
                 </Stack>
               ) : null}
@@ -436,6 +593,7 @@ function AuthenticatedApp() {
                     canUpdate={canUpdate}
                     error={error}
                     memory={selectedMemory}
+                    transcript={detailTranscript}
                     updating={updating}
                     value={detailDraft}
                     onChange={setDetailDraft}

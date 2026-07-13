@@ -71,6 +71,13 @@ body {
   opacity: 0.78;
 }
 
+.memory-proposal {
+  align-self: flex-start;
+  background: var(--mantine-color-yellow-0);
+  border-color: var(--mantine-color-yellow-3);
+  max-width: min(92%, 560px);
+}
+
 .timeline-card {
   border-radius: var(--mantine-radius-md);
   color: inherit;

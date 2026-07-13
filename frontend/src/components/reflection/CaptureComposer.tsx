@@ -1,10 +1,15 @@
 import { useEffect, useMemo, useRef } from "react";
 import { Box, Button, Group, Paper, Stack, Text, Textarea, Title } from "@mantine/core";
+import type { MemoryProposal } from "../../types";
+import { MemoryProposalCard } from "./MemoryProposalCard";
 
 export interface CaptureChatMessage {
   id: string;
+  clientMessageId?: string;
   role: "assistant" | "user";
   content: string;
+  proposal?: MemoryProposal;
+  proposalStatus?: "dismissed" | "pending" | "saved";
   status?: "sending" | "error";
 }
 
@@ -12,8 +17,12 @@ interface CaptureComposerProps {
   value: string;
   canSave: boolean;
   messages: CaptureChatMessage[];
+  proposalSavingId: string | null;
   saving: boolean;
   onChange: (value: string) => void;
+  onChangeProposal: (messageId: string, proposal: MemoryProposal) => void;
+  onDismissProposal: (messageId: string) => void;
+  onSaveProposal: (messageId: string) => void;
   onSave: () => void;
 }
 
@@ -25,8 +34,12 @@ export function CaptureComposer({
   value,
   canSave,
   messages,
+  proposalSavingId,
   saving,
   onChange,
+  onChangeProposal,
+  onDismissProposal,
+  onSaveProposal,
   onSave,
 }: CaptureComposerProps) {
   const words = useMemo(() => wordCount(value), [value]);
@@ -68,38 +81,38 @@ export function CaptureComposer({
             >
               <Stack gap="sm">
                 {messages.map((message) => (
-                  <Box
-                    className={[
-                      "capture-chat__bubble",
-                      `capture-chat__bubble--${message.role}`,
-                      message.status === "error" ? "capture-chat__bubble--error" : "",
-                    ]
-                      .filter(Boolean)
-                      .join(" ")}
-                    key={message.id}
-                  >
-                    <Text className="capture-chat__speaker" fw={600} size="xs">
-                      {message.role === "assistant" ? "Pensieve" : "You"}
-                    </Text>
-                    <Text size="sm">{message.content}</Text>
-                    {message.status ? (
-                      <Text className="capture-chat__status" size="xs">
-                        {message.status === "sending" ? "Saving..." : "Not saved"}
+                  <Stack gap="xs" key={message.id}>
+                    <Box
+                      className={[
+                        "capture-chat__bubble",
+                        `capture-chat__bubble--${message.role}`,
+                        message.status === "error" ? "capture-chat__bubble--error" : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                    >
+                      <Text className="capture-chat__speaker" fw={600} size="xs">
+                        {message.role === "assistant" ? "Pensieve" : "You"}
                       </Text>
+                      <Text size="sm">{message.content}</Text>
+                      {message.status ? (
+                        <Text className="capture-chat__status" size="xs">
+                          {message.status === "sending" ? "Sending..." : "Not sent"}
+                        </Text>
+                      ) : null}
+                    </Box>
+                    {message.proposal && message.proposalStatus !== "dismissed" ? (
+                      <MemoryProposalCard
+                        proposal={message.proposal}
+                        saved={message.proposalStatus === "saved"}
+                        saving={proposalSavingId === message.id}
+                        onChange={(proposal) => onChangeProposal(message.id, proposal)}
+                        onDismiss={() => onDismissProposal(message.id)}
+                        onSave={() => onSaveProposal(message.id)}
+                      />
                     ) : null}
-                  </Box>
+                  </Stack>
                 ))}
-
-                {saving ? (
-                  <Box className="capture-chat__bubble capture-chat__bubble--assistant">
-                    <Text className="capture-chat__speaker" fw={600} size="xs">
-                      Pensieve
-                    </Text>
-                    <Text c="dimmed" size="sm">
-                      Thinking...
-                    </Text>
-                  </Box>
-                ) : null}
               </Stack>
             </Box>
 
@@ -114,8 +127,8 @@ export function CaptureComposer({
             >
               <Stack gap="sm">
                 <Textarea
-                  aria-label="Message to save as a memory"
-                  placeholder="Write a memory..."
+                  aria-label="Message to Pensieve"
+                  placeholder="Write to Pensieve..."
                   rows={3}
                   value={value}
                   onChange={(event) => onChange(event.currentTarget.value)}
@@ -137,7 +150,7 @@ export function CaptureComposer({
                   </Text>
 
                   <Button
-                    aria-label="Send memory"
+                    aria-label="Send message"
                     disabled={!canSave || saving}
                     loading={saving}
                     radius="sm"

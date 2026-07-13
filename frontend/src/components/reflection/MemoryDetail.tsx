@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { Alert, Button, Group, Modal, Paper, Stack, Text, Textarea, Title } from "@mantine/core";
-import type { Memory } from "../../types";
+import type { Memory, ReflectionMessage } from "../../types";
+import { MemoryTranscript } from "./MemoryTranscript";
 
 interface MemoryDetailProps {
   memory: Memory | null;
+  transcript: ReflectionMessage[] | null;
   value: string;
   error: string | null;
   canUpdate: boolean;
@@ -15,6 +17,7 @@ interface MemoryDetailProps {
 
 export function MemoryDetail({
   memory,
+  transcript,
   value,
   error,
   canUpdate,
@@ -39,18 +42,22 @@ export function MemoryDetail({
 
           <Stack gap="xs">
             <Title order={2} size="h3">
-              Summary
+              {memory.title}
             </Title>
-            <Text>{memory.summary}</Text>
+            {memory.summary !== memory.title ? <Text>{memory.summary}</Text> : null}
           </Stack>
 
-          <Textarea
-            label="Original"
-            rows={6}
-            value={value}
-            aria-label="Original memory input"
-            onChange={(event) => onChange(event.currentTarget.value)}
-          />
+          {memory.sessionId ? (
+            transcript ? <MemoryTranscript messages={transcript} /> : <Text c="dimmed">Loading source conversation...</Text>
+          ) : (
+            <Textarea
+              label="Original"
+              rows={6}
+              value={value}
+              aria-label="Original memory input"
+              onChange={(event) => onChange(event.currentTarget.value)}
+            />
+          )}
 
           {error ? (
             <Alert color="red" role="alert" title="Something went wrong">
@@ -68,9 +75,11 @@ export function MemoryDetail({
             >
               Delete memory
             </Button>
-            <Button disabled={!canUpdate || updating} loading={updating} radius="sm" onClick={onUpdate}>
-              Save changes
-            </Button>
+            {!memory.sessionId ? (
+              <Button disabled={!canUpdate || updating} loading={updating} radius="sm" onClick={onUpdate}>
+                Save changes
+              </Button>
+            ) : null}
           </Group>
         </Stack>
       </Paper>
