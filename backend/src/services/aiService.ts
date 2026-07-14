@@ -21,6 +21,8 @@ const MAX_PROPOSAL_TITLE_CHARS = 120;
 const MAX_PROPOSAL_SUMMARY_CHARS = 600;
 const MEMORY_PERMISSION_QUESTION =
   /\b(would you like|do you want|want me to|should i|shall i|can i)\b[\s\S]{0,120}\b(save|keep|store|remember|capture|hold onto|turn this into)\b[\s\S]{0,80}\b(memory|reflection|note|entry|this|that|it)\b/i;
+const PAUSE_REQUEST =
+  /(?:\b(stop|pause|come back|return (?:to )?(?:this|it)(?: later)?|continue later|pick (?:this|it) up later|that(?:'s| is) all|nothing else to add)\b|暂停|暫停|停止|先停(?:一下)?|不想(?:再)?(?:继续|繼續)|(?:之后|之後|以后|以後|下次|稍后|稍後|晚点|晚點|改天)再(?:继续|繼續)|回(?:头|頭)再(?:聊|说|說))/iu;
 let client: OpenAI | null = null;
 
 function getTokenLimitParam(model: string, maxTokens: number) {
@@ -59,17 +61,15 @@ function asksToSaveMemory(text: string): boolean {
 }
 
 function asksQuestion(text: string): boolean {
-  return text.includes("?");
+  return questionCount(text) > 0;
 }
 
 function questionCount(text: string): number {
-  return text.match(/\?/g)?.length ?? 0;
+  return text.normalize("NFKC").match(/\?/g)?.length ?? 0;
 }
 
 function asksToPauseReflection(text: string): boolean {
-  return /\b(stop|pause|come back|return (?:to )?(?:this|it)(?: later)?|continue later|pick (?:this|it) up later|that(?:'s| is) all|nothing else to add)\b/i.test(
-    text
-  );
+  return PAUSE_REQUEST.test(text);
 }
 
 function normalizeReflectionMessages(messages: ReflectionChatMessage[]): ReflectionAIMessage[] {

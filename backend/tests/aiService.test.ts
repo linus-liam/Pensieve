@@ -84,6 +84,16 @@ describe("aiService acknowledgements", () => {
       "I'm with you in that. What part of this feels most important to understand next?"
     );
   });
+
+  it("accepts a Chinese follow-up question with full-width punctuation", async () => {
+    const reply = "听起来那一刻对你很重要。当时你最先注意到的是什么？";
+    openAIMocks.createCompletion.mockResolvedValueOnce({
+      choices: [{ message: { content: reply } }],
+    });
+    const { acknowledgeMemory } = await import("../src/services/aiService.js");
+
+    await expect(acknowledgeMemory("那天让我感到很平静。")).resolves.toBe(reply);
+  });
 });
 
 describe("aiService reflection turns", () => {
@@ -138,6 +148,19 @@ describe("aiService reflection turns", () => {
     }
   );
 
+  it("accepts a Chinese exploring reply with a full-width question mark", async () => {
+    const reply = "听起来那一刻让你很意外。接下来发生了什么？";
+    openAIMocks.createCompletion.mockResolvedValueOnce(
+      completion({ state: "exploring", reply, memoryProposal: null })
+    );
+    const { continueReflection } = await import("../src/services/aiService.js");
+
+    await expect(
+      continueReflection([{ id: "user-1", role: "user", content: "我找到了一张旧照片。" }])
+    ).resolves.toMatchObject({ state: "exploring", reply });
+    expect(openAIMocks.createCompletion).toHaveBeenCalledTimes(1);
+  });
+
   it("accepts a question-free paused reply when the user wants to stop", async () => {
     openAIMocks.createCompletion.mockResolvedValue(
       completion({
@@ -161,6 +184,24 @@ describe("aiService reflection turns", () => {
       reply: "Understood — we can pause here.",
       memoryProposal: null,
     });
+  });
+
+  it("accepts a paused reply when the user asks to pause in Chinese", async () => {
+    const reply = "好的，我们可以先停在这里。";
+    openAIMocks.createCompletion.mockResolvedValueOnce(
+      completion({ state: "paused", reply, memoryProposal: null })
+    );
+    const { continueReflection } = await import("../src/services/aiService.js");
+
+    await expect(
+      continueReflection([
+        {
+          id: "user-1",
+          role: "user",
+          content: "我想先暂停一下，之后再继续。",
+        },
+      ])
+    ).resolves.toEqual({ state: "paused", reply, memoryProposal: null });
   });
 
   it("retries once when structured output fails semantic validation", async () => {
