@@ -1,16 +1,31 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import {
+  ActionIcon,
   Alert,
   AppShell,
   Button,
   Container,
+  Divider,
   Group,
   Loader,
   MantineProvider,
+  Menu,
+  Modal,
+  SegmentedControl,
+  Skeleton,
   Text,
+  TextInput,
   Stack,
   Title,
 } from "@mantine/core";
+import { ArrowLeft, CircleUserRound, LogOut, Search, X } from "lucide-react";
 import { api, ApiError } from "./api/client";
 import { AuthGate } from "./auth/AuthGate";
 import { useAuth } from "./auth/AuthProvider";
@@ -29,9 +44,11 @@ import type {
   ReflectionMessage,
   ReflectionSession,
 } from "./types";
+import { pensieveTheme } from "./theme";
 
 type Page = "capture" | "memories" | "detail";
 type NavPage = "capture" | "memories";
+type MemoryPeriod = "all" | "earlier" | "week";
 
 interface RouteState {
   page: Page;
@@ -67,7 +84,7 @@ function getDayLabel(value: string) {
   if (isSameDay(date, yesterday)) return "Yesterday";
 
   const diffMs = today.getTime() - date.getTime();
-  if (diffMs < 1000 * 60 * 60 * 24 * 7) return "This Week";
+  if (diffMs >= 0 && diffMs < 1000 * 60 * 60 * 24 * 7) return "This Week";
 
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
@@ -84,17 +101,22 @@ function inferTags(content: string) {
   return ["reflection"];
 }
 
+function getMemoryEntryTitle(entry: MemoryEntry) {
+  return entry.title || entry.ai_summary;
+}
+
 function toMemory(entry: MemoryEntry): Memory {
   return {
     id: entry.id,
     sessionId: entry.session_id ?? null,
-    title: entry.title || entry.ai_summary,
+    title: getMemoryEntryTitle(entry),
     day: getDayLabel(entry.created_at),
     time: formatTime(entry.created_at),
     source: "Text",
     sourceType: "text",
     summary: entry.ai_summary,
     rawInput: entry.raw_input,
+    createdAt: entry.created_at,
     tags: inferTags(entry.raw_input),
   };
 }
@@ -111,9 +133,10 @@ function toCaptureMessage(message: ReflectionMessage): CaptureChatMessage {
       ? message.metadata.proposalState === "saved"
         ? "saved"
         : message.metadata.proposalState === "dismissed"
-          ? "dismissed"
+          ? "deferred"
           : "pending"
       : undefined,
+    savedMemoryId: message.metadata.memoryEntryId,
   };
 }
 
@@ -159,9 +182,17 @@ function AuthenticatedApp() {
   const [entries, setEntries] = useState<MemoryEntry[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(initialRoute.selectedId);
   const [detailDraft, setDetailDraft] = useState("");
+  const [detailTitleDraft, setDetailTitleDraft] = useState("");
+  const [detailSummaryDraft, setDetailSummaryDraft] = useState("");
+  const [detailEditing, setDetailEditing] = useState(false);
+  const [detailSuccess, setDetailSuccess] = useState<string | null>(null);
   const [detailTranscript, setDetailTranscript] = useState<ReflectionMessage[] | null>(null);
+  const [memoryQuery, setMemoryQuery] = useState("");
+  const [memoryPeriod, setMemoryPeriod] = useState<MemoryPeriod>("all");
+  const [pendingRoute, setPendingRoute] = useState<RouteState | null>(null);
   const [loading, setLoading] = useState(true);
   const [proposalSavingId, setProposalSavingId] = useState<string | null>(null);
+  const [startingNew, setStartingNew] = useState(false);
   const [saving, setSaving] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -215,10 +246,43 @@ function AuthenticatedApp() {
   }, []);
 
   const memories = useMemo(() => entries.map(toMemory), [entries]);
+  const deferredMemoryQuery = useDeferredValue(memoryQuery.trim().toLocaleLowerCase());
+  const filteredMemories = useMemo(() => {
+    const weekMs = 1000 * 60 * 60 * 24 * 7;
+    const now = Date.now();
+
+    return memories.filter((memory) => {
+      const ageMs = now - new Date(memory.createdAt).getTime();
+      const matchesPeriod =
+        memoryPeriod === "all" ||
+        (memoryPeriod === "week" && ageMs >= 0 && ageMs < weekMs) ||
+        (memoryPeriod === "earlier" && ageMs >= weekMs);
+      if (!matchesPeriod) return false;
+      if (!deferredMemoryQuery) return true;
+
+      return [memory.title, memory.summary, memory.rawInput, memory.day, ...memory.tags]
+        .join(" ")
+        .toLocaleLowerCase()
+        .includes(deferredMemoryQuery);
+    });
+  }, [deferredMemoryQuery, memories, memoryPeriod]);
   const selectedEntry = entries.find((entry) => entry.id === selectedId) ?? null;
   const selectedMemory = selectedEntry ? toMemory(selectedEntry) : null;
   const canSave = draft.trim().length > 0;
-  const canUpdate = detailDraft.trim().length > 0 && detailDraft.trim() !== selectedEntry?.raw_input;
+  const detailHasChanges = Boolean(
+    selectedEntry &&
+      (detailTitleDraft.trim() !== getMemoryEntryTitle(selectedEntry) ||
+        detailSummaryDraft.trim() !== selectedEntry.ai_summary ||
+        (!selectedEntry.session_id && detailDraft.trim() !== selectedEntry.raw_input))
+  );
+  const canUpdate = Boolean(
+    selectedEntry &&
+      detailEditing &&
+      detailTitleDraft.trim() &&
+      detailSummaryDraft.trim() &&
+      (selectedEntry.session_id || detailDraft.trim()) &&
+      detailHasChanges
+  );
   const activeNavPage = getActiveNavPage(page);
 
   const applyRoute = useCallback((route: RouteState) => {
@@ -228,14 +292,33 @@ function AuthenticatedApp() {
     if (route.page !== "detail") {
       setSelectedId(null);
       setDetailDraft("");
+      setDetailTitleDraft("");
+      setDetailSummaryDraft("");
+      setDetailEditing(false);
+      setDetailSuccess(null);
       hydratedDetailId.current = null;
     } else {
+      setDetailEditing(false);
+      setDetailSuccess(null);
       hydratedDetailId.current = null;
     }
   }, []);
 
   useEffect(() => {
-    const handleRouteChange = () => applyRoute(getRouteFromHash());
+    const handleRouteChange = () => {
+      const nextRoute = getRouteFromHash();
+      const routeChanged = nextRoute.page !== page || nextRoute.selectedId !== selectedId;
+
+      if (!routeChanged) return;
+
+      if (page === "detail" && detailEditing && detailHasChanges) {
+        setPendingRoute(nextRoute);
+        window.history.replaceState(null, "", getHashForRoute(page, selectedId));
+        return;
+      }
+
+      applyRoute(nextRoute);
+    };
 
     window.addEventListener("hashchange", handleRouteChange);
     window.addEventListener("popstate", handleRouteChange);
@@ -244,13 +327,28 @@ function AuthenticatedApp() {
       window.removeEventListener("hashchange", handleRouteChange);
       window.removeEventListener("popstate", handleRouteChange);
     };
-  }, [applyRoute]);
+  }, [applyRoute, detailEditing, detailHasChanges, page, selectedId]);
+
+  useEffect(() => {
+    if (!detailEditing || !detailHasChanges) return;
+
+    const protectUnsavedChanges = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", protectUnsavedChanges);
+    return () => window.removeEventListener("beforeunload", protectUnsavedChanges);
+  }, [detailEditing, detailHasChanges]);
 
   useEffect(() => {
     if (page !== "detail" || !selectedEntry) return;
     if (hydratedDetailId.current === selectedEntry.id) return;
 
     setDetailDraft(selectedEntry.raw_input);
+    setDetailTitleDraft(getMemoryEntryTitle(selectedEntry));
+    setDetailSummaryDraft(selectedEntry.ai_summary);
+    setDetailEditing(false);
+    setDetailSuccess(null);
     hydratedDetailId.current = selectedEntry.id;
   }, [page, selectedEntry]);
 
@@ -280,7 +378,7 @@ function AuthenticatedApp() {
     };
   }, [page, selectedEntry?.session_id]);
 
-  const navigate = useCallback(
+  const commitNavigate = useCallback(
     (nextPage: Page, memoryId?: string) => {
       const nextSelectedId = nextPage === "detail" ? memoryId ?? selectedId : null;
       if (nextPage === "detail" && !nextSelectedId) return;
@@ -290,30 +388,51 @@ function AuthenticatedApp() {
 
       if (nextPage !== "detail") {
         setDetailDraft("");
+        setDetailTitleDraft("");
+        setDetailSummaryDraft("");
+        setDetailEditing(false);
+        setDetailSuccess(null);
         hydratedDetailId.current = null;
       }
 
       const nextHash = getHashForRoute(nextPage, nextSelectedId);
       if (window.location.hash !== nextHash) {
-        window.location.hash = nextHash;
+        window.history.pushState(null, "", nextHash);
       }
     },
     [selectedId]
   );
 
-  const navigateFromNav = useCallback(
-    (nextPage: NavPage) => {
-      navigate(nextPage);
+  const requestNavigate = useCallback(
+    (nextPage: Page, memoryId?: string) => {
+      const nextSelectedId = nextPage === "detail" ? memoryId ?? selectedId : null;
+      const routeChanged = nextPage !== page || nextSelectedId !== selectedId;
+
+      if (routeChanged && page === "detail" && detailEditing && detailHasChanges) {
+        setPendingRoute({ page: nextPage, selectedId: nextSelectedId });
+        return;
+      }
+
+      commitNavigate(nextPage, memoryId);
     },
-    [navigate]
+    [commitNavigate, detailEditing, detailHasChanges, page, selectedId]
   );
 
-  const sendReflectionMessage = useCallback(async () => {
-    const rawInput = draft.trim();
+  const navigateFromNav = useCallback(
+    (nextPage: NavPage) => {
+      requestNavigate(nextPage);
+    },
+    [requestNavigate]
+  );
+
+  const sendReflectionMessage = useCallback(async (retry?: {
+    clientMessageId: string;
+    content: string;
+  }) => {
+    const rawInput = retry?.content ?? draft.trim();
     if (!rawInput || saving || !reflectionSession) return;
 
-    const clientMessageId =
-      retryMessage?.content === rawInput ? retryMessage.clientMessageId : crypto.randomUUID();
+    const clientMessageId = retry?.clientMessageId ?? crypto.randomUUID();
     const userMessageId = `pending-${clientMessageId}`;
     const userMessage: CaptureChatMessage = {
       id: userMessageId,
@@ -327,9 +446,7 @@ function AuthenticatedApp() {
     setDraft("");
     setCaptureMessages((current) => [
       ...current.filter(
-        (message) =>
-          message.clientMessageId !== clientMessageId &&
-          message.id !== `assistant-error-${clientMessageId}`
+        (message) => message.clientMessageId !== clientMessageId
       ),
       userMessage,
     ]);
@@ -345,39 +462,38 @@ function AuthenticatedApp() {
           .filter(
             (message) =>
               message.id !== userMessageId &&
-              message.clientMessageId !== clientMessageId &&
-              message.id !== `assistant-error-${clientMessageId}`
+              message.clientMessageId !== clientMessageId
           )
           .concat(toCaptureMessage(reflection.userMessage)),
         toCaptureMessage(reflection.assistantMessage),
       ]);
       setRetryMessage(null);
-    } catch (saveError) {
-      setDraft(rawInput);
-      setError(
-        saveError instanceof Error ? saveError.message : "Could not continue reflection"
-      );
+    } catch {
+      setDraft((current) => current.trim() || rawInput);
+      setError(null);
       setRetryMessage({ clientMessageId, content: rawInput });
-      setCaptureMessages((current) => [
-        ...current.map((message) =>
+      setCaptureMessages((current) =>
+        current.map((message) =>
           message.id === userMessageId ? { ...message, status: "error" as const } : message
-        ),
-        {
-          id: `assistant-error-${clientMessageId}`,
-          role: "assistant",
-          content: "I couldn't send that just now. Your words are still here.",
-          status: "error",
-        },
-      ]);
+        )
+      );
     } finally {
       setSaving(false);
     }
-  }, [draft, reflectionSession, retryMessage, saving]);
+  }, [draft, reflectionSession, saving]);
 
   const dismissProposal = useCallback((messageId: string) => {
     setCaptureMessages((current) =>
       current.map((message) =>
-        message.id === messageId ? { ...message, proposalStatus: "dismissed" as const } : message
+        message.id === messageId ? { ...message, proposalStatus: "deferred" as const } : message
+      )
+    );
+  }, []);
+
+  const restoreProposal = useCallback((messageId: string) => {
+    setCaptureMessages((current) =>
+      current.map((message) =>
+        message.id === messageId ? { ...message, proposalStatus: "pending" as const } : message
       )
     );
   }, []);
@@ -410,7 +526,11 @@ function AuthenticatedApp() {
         setCaptureMessages((current) =>
           current.map((message) =>
             message.id === messageId
-              ? { ...message, proposalStatus: "saved" as const }
+              ? {
+                  ...message,
+                  proposalStatus: "saved" as const,
+                  savedMemoryId: entry.id,
+                }
               : message
           )
         );
@@ -423,32 +543,97 @@ function AuthenticatedApp() {
     [captureMessages, proposalSavingId, reflectionSession]
   );
 
+  const startNewReflection = useCallback(async () => {
+    if (startingNew) return;
+
+    setStartingNew(true);
+    setError(null);
+    try {
+      const detail = await api.startNewReflectionSession();
+      setReflectionSession(detail.session);
+      setCaptureMessages(detail.messages.map(toCaptureMessage));
+      setDraft("");
+      setRetryMessage(null);
+    } catch (startError) {
+      setError(
+        startError instanceof Error ? startError.message : "Could not start a new memory"
+      );
+    } finally {
+      setStartingNew(false);
+    }
+  }, [startingNew]);
+
   const openMemory = useCallback((memory: Memory) => {
     setSelectedId(memory.id);
     setDetailDraft(memory.rawInput);
+    setDetailTitleDraft(memory.title);
+    setDetailSummaryDraft(memory.summary);
+    setDetailEditing(false);
+    setDetailSuccess(null);
     hydratedDetailId.current = memory.id;
-    navigate("detail", memory.id);
-  }, [navigate]);
+    commitNavigate("detail", memory.id);
+  }, [commitNavigate]);
+
+  const viewSavedMemory = useCallback(
+    (memoryId: string) => {
+      const entry = entries.find((item) => item.id === memoryId);
+      if (!entry) return;
+      openMemory(toMemory(entry));
+    },
+    [entries, openMemory]
+  );
 
   const updateMemory = useCallback(async () => {
     if (!selectedEntry || !canUpdate || updating) return;
 
     setUpdating(true);
     setError(null);
+    setDetailSuccess(null);
 
     try {
-      const updated = await api.updateMemoryEntry(selectedEntry.id, detailDraft.trim());
+      const input = {
+        ...(detailTitleDraft.trim() !== getMemoryEntryTitle(selectedEntry)
+          ? { title: detailTitleDraft.trim() }
+          : {}),
+        ...(detailSummaryDraft.trim() !== selectedEntry.ai_summary
+          ? { summary: detailSummaryDraft.trim() }
+          : {}),
+        ...(!selectedEntry.session_id && detailDraft.trim() !== selectedEntry.raw_input
+          ? { rawInput: detailDraft.trim() }
+          : {}),
+      };
+      const updated = await api.updateMemoryEntry(selectedEntry.id, input);
       setEntries((current) =>
         current.map((entry) => (entry.id === updated.id ? updated : entry))
       );
       setDetailDraft(updated.raw_input);
+      setDetailTitleDraft(getMemoryEntryTitle(updated));
+      setDetailSummaryDraft(updated.ai_summary);
+      setDetailEditing(false);
+      setDetailSuccess("Changes saved.");
       hydratedDetailId.current = updated.id;
     } catch (updateError) {
       setError(updateError instanceof Error ? updateError.message : "Could not update memory");
     } finally {
       setUpdating(false);
     }
-  }, [canUpdate, detailDraft, selectedEntry, updating]);
+  }, [
+    canUpdate,
+    detailDraft,
+    detailSummaryDraft,
+    detailTitleDraft,
+    selectedEntry,
+    updating,
+  ]);
+
+  const cancelMemoryEdit = useCallback(() => {
+    if (!selectedEntry) return;
+    setDetailDraft(selectedEntry.raw_input);
+    setDetailTitleDraft(getMemoryEntryTitle(selectedEntry));
+    setDetailSummaryDraft(selectedEntry.ai_summary);
+    setDetailEditing(false);
+    setDetailSuccess(null);
+  }, [selectedEntry]);
 
   const deleteMemory = useCallback(async () => {
     if (!selectedEntry || updating) return;
@@ -459,21 +644,23 @@ function AuthenticatedApp() {
     try {
       await api.deleteMemoryEntry(selectedEntry.id);
       setEntries((current) => current.filter((entry) => entry.id !== selectedEntry.id));
-      navigate("memories");
+      setDetailEditing(false);
+      commitNavigate("memories");
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : "Could not delete memory");
     } finally {
       setUpdating(false);
     }
-  }, [navigate, selectedEntry, updating]);
+  }, [commitNavigate, selectedEntry, updating]);
 
   return (
     <>
       <AppShell
-        navbar={{ width: 240, breakpoint: "sm", collapsed: { mobile: true } }}
-        padding="md"
+        className="app-shell"
+        navbar={{ width: 248, breakpoint: "sm", collapsed: { mobile: true } }}
+        padding={0}
       >
-        <AppShell.Navbar p="md">
+        <AppShell.Navbar>
           <SideNav
             page={activeNavPage}
             signingOut={signingOut}
@@ -484,27 +671,41 @@ function AuthenticatedApp() {
         </AppShell.Navbar>
 
         <AppShell.Main className="app-content">
-          <Container py="lg" size="sm">
+          <Container className="app-container" fluid>
             <Stack gap="md">
-              <Group className="account-bar" gap="sm" justify="space-between" wrap="nowrap">
-                <Text c="dimmed" lineClamp={1} size="sm">
-                  {user?.email ?? "Google account"}
-                </Text>
-                <Button
-                  loading={signingOut}
-                  radius="sm"
-                  size="xs"
-                  variant="default"
-                  onClick={signOut}
-                >
-                  Sign out
-                </Button>
+              <Group className="mobile-app-header" justify="space-between" wrap="nowrap">
+                <Text className="mobile-app-header__brand">Pensieve</Text>
+                <Menu position="bottom-end" shadow="md" width={220}>
+                  <Menu.Target>
+                    <ActionIcon
+                      aria-label="Open account menu"
+                      className="mobile-account-button"
+                      variant="subtle"
+                    >
+                      <CircleUserRound aria-hidden="true" size={22} strokeWidth={1.7} />
+                    </ActionIcon>
+                  </Menu.Target>
+                  <Menu.Dropdown>
+                    <Menu.Label>Signed in as</Menu.Label>
+                    <Text className="mobile-account-email" lineClamp={1} px="sm" pb="xs" size="sm">
+                      {user?.email ?? "Google account"}
+                    </Text>
+                    <Divider />
+                    <Menu.Item
+                      color="red"
+                      leftSection={<LogOut aria-hidden="true" size={15} />}
+                      onClick={signOut}
+                    >
+                      {signingOut ? "Signing out…" : "Sign out"}
+                    </Menu.Item>
+                  </Menu.Dropdown>
+                </Menu>
               </Group>
 
               {page === "capture" ? (
-                <Stack gap="lg">
+                <Stack className="capture-page" gap="lg">
                   {error ? (
-                    <Alert color="red" role="alert" title="Something went wrong">
+                    <Alert className="page-alert" color="red" role="alert" title="Something went wrong">
                       {error}
                     </Alert>
                   ) : null}
@@ -513,46 +714,130 @@ function AuthenticatedApp() {
                     messages={captureMessages}
                     proposalSavingId={proposalSavingId}
                     saving={saving}
+                    startingNew={startingNew}
                     value={draft}
                     onChange={setDraft}
                     onChangeProposal={changeProposal}
                     onDismissProposal={dismissProposal}
-                    onSave={sendReflectionMessage}
+                    onRestoreProposal={restoreProposal}
+                    onRetry={() => {
+                      if (retryMessage) void sendReflectionMessage(retryMessage);
+                    }}
+                    onSave={() => void sendReflectionMessage()}
                     onSaveProposal={saveProposal}
+                    onStartNew={() => void startNewReflection()}
+                    onViewMemory={viewSavedMemory}
                   />
                 </Stack>
               ) : null}
 
               {page === "memories" ? (
-                <Stack gap="md">
-                  <Group justify="space-between" wrap="nowrap">
-                    <Title order={2} size="h2">
-                      Memories
-                    </Title>
-                    <Button radius="sm" size="xs" variant="default" onClick={loadEntries}>
-                      Refresh
-                    </Button>
-                  </Group>
+                <Stack className="memories-page" gap="xl">
+                  <header className="memories-page__header">
+                    <Title className="memories-page__title" order={1}>Memories</Title>
+                  </header>
 
                   {error ? (
-                    <Alert color="red" role="alert" title="Something went wrong">
-                      {error}
-                    </Alert>
-                  ) : null}
-
-                  {loading ? (
-                    <Group gap="xs">
-                      <Loader size="sm" />
-                      <Text c="dimmed">Loading memories...</Text>
+                    <Group gap="sm" role="alert">
+                      <Text c="red" size="sm">
+                        {error}
+                      </Text>
+                      <Button
+                        className="button-secondary"
+                        size="compact-sm"
+                        variant="default"
+                        onClick={loadEntries}
+                      >
+                        Try again
+                      </Button>
                     </Group>
                   ) : null}
 
-                  {!loading && memories.length === 0 ? (
-                    <Text c="dimmed">No memories saved yet.</Text>
+                  {memories.length > 0 ? (
+                    <Stack className="memories-tools" gap="sm">
+                      <Group align="stretch" gap="sm" wrap="wrap">
+                        <TextInput
+                          aria-label="Search memories"
+                          className="memories-search"
+                          leftSection={<Search aria-hidden="true" size={17} />}
+                          placeholder="Search memories"
+                          rightSection={
+                            memoryQuery ? (
+                              <ActionIcon
+                                aria-label="Clear memory search"
+                                className="memories-search__clear"
+                                variant="subtle"
+                                onClick={() => setMemoryQuery("")}
+                              >
+                                <X aria-hidden="true" size={17} />
+                              </ActionIcon>
+                            ) : null
+                          }
+                          rightSectionPointerEvents="all"
+                          value={memoryQuery}
+                          onChange={(event) => setMemoryQuery(event.currentTarget.value)}
+                        />
+                        <SegmentedControl
+                          aria-label="Filter memories by date"
+                          className="memories-period-filter"
+                          data={[
+                            { label: "All", value: "all" },
+                            { label: "This week", value: "week" },
+                            { label: "Earlier", value: "earlier" },
+                          ]}
+                          value={memoryPeriod}
+                          onChange={(value) => setMemoryPeriod(value as MemoryPeriod)}
+                        />
+                      </Group>
+                      <Text aria-live="polite" className="memories-results" size="sm">
+                        {filteredMemories.length === memories.length && !deferredMemoryQuery
+                          ? `${memories.length} ${memories.length === 1 ? "memory" : "memories"}`
+                          : `${filteredMemories.length} of ${memories.length} memories`}
+                      </Text>
+                    </Stack>
                   ) : null}
 
-                  {memories.length > 0 ? (
-                    <Timeline memories={memories} onOpenMemory={openMemory} />
+                  {loading && memories.length === 0 ? (
+                    <Stack aria-label="Loading memories" className="memory-skeletons" gap="xl" role="status">
+                      {[0, 1, 2].map((item) => (
+                        <Stack className="memory-skeleton" gap="xs" key={item}>
+                          <Skeleton height={18} radius="sm" width="46%" />
+                          <Skeleton height={14} radius="sm" width="82%" />
+                        </Stack>
+                      ))}
+                    </Stack>
+                  ) : null}
+
+                  {!loading && memories.length === 0 ? (
+                    <Stack align="flex-start" className="memories-empty" gap="md">
+                      <Title order={2} size="h3">No memories yet</Title>
+                      <Button className="button-primary" onClick={() => requestNavigate("capture")}>
+                        Capture a memory
+                      </Button>
+                    </Stack>
+                  ) : null}
+
+                  {!loading && memories.length > 0 && filteredMemories.length === 0 ? (
+                    <Stack align="flex-start" className="memories-empty" gap="md">
+                      <Title order={2} size="h3">No matching memories</Title>
+                      <Text className="memories-empty__copy">
+                        Try another search or clear the date filter.
+                      </Text>
+                      <Button
+                        className="button-secondary"
+                        variant="default"
+                        onClick={() => {
+                          setMemoryQuery("");
+                          setMemoryPeriod("all");
+                        }}
+                      >
+                        Clear filters
+                      </Button>
+                    </Stack>
+                  ) : null}
+
+                  {filteredMemories.length > 0 ? (
+                    <Timeline memories={filteredMemories} onOpenMemory={openMemory} />
                   ) : null}
                 </Stack>
               ) : null}
@@ -560,13 +845,13 @@ function AuthenticatedApp() {
               {page === "detail" && loading && !selectedMemory ? (
                 <Stack gap="md">
                   <Button
-                    radius="sm"
-                    size="xs"
+                    className="button-secondary page-back"
+                    leftSection={<ArrowLeft aria-hidden="true" size={16} />}
                     variant="subtle"
                     w="fit-content"
-                    onClick={() => navigate("memories")}
+                    onClick={() => requestNavigate("memories")}
                   >
-                    Back
+                    Back to memories
                   </Button>
                   <Group gap="xs">
                     <Loader size="sm" />
@@ -578,26 +863,34 @@ function AuthenticatedApp() {
               {page === "detail" && (!loading || selectedMemory) ? (
                 <Stack gap="md">
                   <Button
-                    radius="sm"
-                    size="xs"
+                    className="button-secondary page-back"
+                    leftSection={<ArrowLeft aria-hidden="true" size={16} />}
                     variant="subtle"
                     w="fit-content"
-                    onClick={() => navigate("memories")}
+                    onClick={() => requestNavigate("memories")}
                   >
-                    Back
+                    Back to memories
                   </Button>
-                  <Title order={2} size="h2">
-                    Memory detail
-                  </Title>
                   <MemoryDetail
                     canUpdate={canUpdate}
+                    editing={detailEditing}
                     error={error}
                     memory={selectedMemory}
+                    rawInputValue={detailDraft}
+                    success={detailSuccess}
+                    summaryValue={detailSummaryDraft}
+                    titleValue={detailTitleDraft}
                     transcript={detailTranscript}
                     updating={updating}
-                    value={detailDraft}
-                    onChange={setDetailDraft}
+                    onCancelEdit={cancelMemoryEdit}
+                    onChangeRawInput={setDetailDraft}
+                    onChangeSummary={setDetailSummaryDraft}
+                    onChangeTitle={setDetailTitleDraft}
                     onDelete={deleteMemory}
+                    onEdit={() => {
+                      setDetailSuccess(null);
+                      setDetailEditing(true);
+                    }}
                     onUpdate={updateMemory}
                   />
                 </Stack>
@@ -608,13 +901,46 @@ function AuthenticatedApp() {
 
         <MobileBottomNav activePage={activeNavPage} onNavigate={navigateFromNav} />
       </AppShell>
+
+      <Modal
+        centered
+        opened={pendingRoute !== null}
+        title="Discard unsaved changes?"
+        onClose={() => setPendingRoute(null)}
+      >
+        <Stack gap="md">
+          <Text size="sm">Your edits to this memory have not been saved.</Text>
+          <Group justify="flex-end">
+            <Button
+              className="button-secondary"
+              variant="default"
+              onClick={() => setPendingRoute(null)}
+            >
+              Keep editing
+            </Button>
+            <Button
+              color="red"
+              onClick={() => {
+                const nextRoute = pendingRoute;
+                setPendingRoute(null);
+                setDetailEditing(false);
+                if (nextRoute) {
+                  commitNavigate(nextRoute.page, nextRoute.selectedId ?? undefined);
+                }
+              }}
+            >
+              Discard changes
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
     </>
   );
 }
 
 export function App() {
   return (
-    <MantineProvider defaultColorScheme="light">
+    <MantineProvider defaultColorScheme="light" theme={pensieveTheme}>
       <AuthGate>
         <AuthenticatedApp />
       </AuthGate>

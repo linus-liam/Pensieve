@@ -61,7 +61,9 @@ router.post(
 router.post(
   "/",
   asyncHandler(async (req, res) => {
-    const detail = await createReflectionSession(requireAuthUserId(req));
+    const detail = await createReflectionSession(requireAuthUserId(req), {
+      replaceActive: req.body?.replaceActive === true,
+    });
     res.status(201).json(detail);
   })
 );

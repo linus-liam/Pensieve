@@ -155,6 +155,28 @@ runDbTests("memory entries API", () => {
       .expect(404);
   });
 
+  it("edits memory titles and summaries without an unnecessary AI request", async () => {
+    aiMocks.summarizeMemory.mockResolvedValue("Original summary.");
+    const created = await request(app)
+      .post("/api/memory-entries")
+      .set("Authorization", `Bearer ${userAToken}`)
+      .send({ rawInput: "Original memory" })
+      .expect(201);
+
+    const updated = await request(app)
+      .patch(`/api/memory-entries/${created.body.id}`)
+      .set("Authorization", `Bearer ${userAToken}`)
+      .send({ title: "A clearer title", summary: "A carefully revised summary." })
+      .expect(200);
+
+    expect(updated.body).toMatchObject({
+      title: "A clearer title",
+      ai_summary: "A carefully revised summary.",
+      raw_input: "Original memory",
+    });
+    expect(aiMocks.summarizeMemory).toHaveBeenCalledTimes(1);
+  });
+
   it("requires a valid Supabase session", async () => {
     await request(app).get("/api/memory-entries").expect(401);
 
@@ -277,6 +299,27 @@ runDbTests("memory entries API", () => {
 
     expect(resumed.body.session.id).toBe(created.body.session.id);
     expect(resumed.body.messages).toEqual(created.body.messages);
+  });
+
+  it("archives an unfinished reflection when the user intentionally starts over", async () => {
+    const first = await request(app)
+      .post("/api/reflection-sessions")
+      .set("Authorization", `Bearer ${userAToken}`)
+      .expect(201);
+    const replacement = await request(app)
+      .post("/api/reflection-sessions")
+      .set("Authorization", `Bearer ${userAToken}`)
+      .send({ replaceActive: true })
+      .expect(201);
+
+    expect(replacement.body.session.id).not.toBe(first.body.session.id);
+    expect(replacement.body.session.status).toBe("active");
+
+    const archived = await request(app)
+      .get(`/api/reflection-sessions/${first.body.session.id}`)
+      .set("Authorization", `Bearer ${userAToken}`)
+      .expect(200);
+    expect(archived.body.session.status).toBe("archived");
   });
 
   it("posts a reflection message idempotently and stores both turns", async () => {
@@ -470,5 +513,59 @@ runDbTests("memory entries API", () => {
       })
       .expect(409);
     expect(duplicate.body.code).toBe("proposal_handled");
+  });
+
+  it("saves a pending proposal created before reflection state metadata was added", async () => {
+    aiMocks.continueReflection.mockImplementationOnce(
+      async (messages: Array<{ id: string; role: string; content: string }>) => {
+        const userMessage = [...messages].reverse().find((message) => message.role === "user");
+        return {
+          state: "proposal_ready",
+          reply: "That feels like a memory worth holding onto.",
+          memoryProposal: {
+            title: "The Collapsed Tent",
+            summary: "I remember Dad laughing when our tent collapsed.",
+            evidence: [
+              {
+                userMessageId: userMessage?.id,
+                excerpt: "Dad laughed when our tent collapsed",
+              },
+            ],
+          },
+        };
+      }
+    );
+    const created = await request(app)
+      .post("/api/reflection-sessions")
+      .set("Authorization", `Bearer ${userAToken}`)
+      .expect(201);
+    const turn = await request(app)
+      .post(`/api/reflection-sessions/${created.body.session.id}/messages`)
+      .set("Authorization", `Bearer ${userAToken}`)
+      .send({
+        clientMessageId: "ffffffff-ffff-4fff-8fff-ffffffffffff",
+        content: "Dad laughed when our tent collapsed, and I felt completely safe.",
+      })
+      .expect(201);
+
+    await pool.query(
+      "UPDATE reflection_messages SET metadata = metadata - 'state' WHERE id = $1",
+      [turn.body.assistantMessage.id]
+    );
+
+    const saved = await request(app)
+      .post(`/api/reflection-sessions/${created.body.session.id}/memory`)
+      .set("Authorization", `Bearer ${userAToken}`)
+      .send({
+        assistantMessageId: turn.body.assistantMessage.id,
+        title: "Camping with Dad",
+        summary: "I remember Dad laughing when our tent collapsed.",
+      })
+      .expect(201);
+
+    expect(saved.body).toMatchObject({
+      session_id: created.body.session.id,
+      title: "Camping with Dad",
+    });
   });
 });

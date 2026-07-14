@@ -9,6 +9,12 @@ export interface MemoryEntry {
   updated_at: string;
 }
 
+export interface UpdateMemoryEntryInput {
+  rawInput?: string;
+  summary?: string;
+  title?: string;
+}
+
 export interface CapturedMemoryEntry extends MemoryEntry {
   acknowledgement: string;
 }
@@ -95,6 +101,7 @@ export interface Memory {
   sourceType: MemorySourceType;
   summary: string;
   rawInput: string;
+  createdAt: string;
   tags: string[];
   image?: string;
   imageAlt?: string;

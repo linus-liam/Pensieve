@@ -1,4 +1,4 @@
-import { Divider, Stack, Text, Title } from "@mantine/core";
+import { Stack, Text } from "@mantine/core";
 import type { Memory } from "../../types";
 import { TimelineCard } from "./TimelineCard";
 
@@ -7,55 +7,42 @@ interface TimelineProps {
   onOpenMemory: (memory: Memory) => void;
 }
 
-const dayOrder = ["Today", "Yesterday"];
-
 function groupMemories(memories: Memory[]) {
-  const groups = new Map<string, Memory[]>();
+  const groups = new Map<string, { memories: Memory[]; newestAt: number }>();
 
   for (const memory of memories) {
-    groups.set(memory.day, [...(groups.get(memory.day) ?? []), memory]);
+    const createdAt = new Date(memory.createdAt).getTime();
+    const current = groups.get(memory.day);
+    groups.set(memory.day, {
+      memories: [...(current?.memories ?? []), memory],
+      newestAt: Math.max(current?.newestAt ?? Number.NEGATIVE_INFINITY, createdAt),
+    });
   }
 
-  return [...groups.entries()].sort(([a], [b]) => {
-    const aIndex = dayOrder.indexOf(a);
-    const bIndex = dayOrder.indexOf(b);
-    if (aIndex === -1 && bIndex === -1) return a.localeCompare(b);
-    if (aIndex === -1) return 1;
-    if (bIndex === -1) return -1;
-    return aIndex - bIndex;
-  });
+  return [...groups.entries()]
+    .sort(([, a], [, b]) => b.newestAt - a.newestAt)
+    .map(([day, group]) => [day, group.memories] as const);
 }
 
 export function Timeline({ memories, onOpenMemory }: TimelineProps) {
-  const groups = groupMemories(memories);
-
   return (
-    <Stack gap="xl">
-      {groups.map(([day, dayMemories]) => (
-        <section key={day} aria-labelledby={`timeline-${day}`}>
-          <Stack gap="sm">
-            <Title id={`timeline-${day}`} order={2} size="h3">
-              {day}
-            </Title>
-
-            <Stack gap="sm">
-              {dayMemories.map((memory) => (
-                <TimelineCard
-                  key={memory.id}
-                  memory={memory}
-                  muted={day !== "Today"}
-                  onOpen={() => onOpenMemory(memory)}
-                />
-              ))}
-            </Stack>
+    <Stack className="memory-list" gap="xl">
+      {groupMemories(memories).map(([day, dayMemories]) => (
+        <section aria-labelledby={`timeline-${day}`} key={day}>
+          <Text className="memory-list__day" id={`timeline-${day}`} mb="xs" size="xs">
+            {day}
+          </Text>
+          <Stack gap={0}>
+            {dayMemories.map((memory) => (
+              <TimelineCard
+                key={memory.id}
+                memory={memory}
+                onOpen={() => onOpenMemory(memory)}
+              />
+            ))}
           </Stack>
         </section>
       ))}
-
-      <Divider />
-      <Text c="dimmed" component="footer" size="sm">
-        That's all for now. Take a breath.
-      </Text>
     </Stack>
   );
 }

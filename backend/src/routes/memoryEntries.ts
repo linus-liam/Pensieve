@@ -14,6 +14,8 @@ import { AppError } from "../errors.js";
 
 const router = Router();
 const MAX_RAW_INPUT_CHARS = Number(process.env.MEMORY_RAW_INPUT_MAX_CHARS ?? 2000);
+const MAX_MEMORY_TITLE_CHARS = 120;
+const MAX_MEMORY_SUMMARY_CHARS = 600;
 
 function requireAuthUserId(req: Request) {
   const userId = req.authUser?.id;
@@ -58,12 +60,28 @@ router.patch(
   memoryWriteRateLimit,
   asyncHandler(async (req, res) => {
     const id = requireUuid(req.params.id, "id");
-    const rawInput = requireText(
-      req.body?.rawInput ?? req.body?.raw_input,
-      "rawInput",
-      MAX_RAW_INPUT_CHARS
-    );
-    const entry = await updateMemoryEntry(requireAuthUserId(req), id, rawInput);
+    const rawInputValue = req.body?.rawInput ?? req.body?.raw_input;
+    const summaryValue = req.body?.summary ?? req.body?.ai_summary;
+    const titleValue = req.body?.title;
+
+    if (rawInputValue === undefined && summaryValue === undefined && titleValue === undefined) {
+      throw new AppError(400, "at least one memory field is required", "invalid_input");
+    }
+
+    const entry = await updateMemoryEntry(requireAuthUserId(req), id, {
+      rawInput:
+        rawInputValue === undefined
+          ? undefined
+          : requireText(rawInputValue, "rawInput", MAX_RAW_INPUT_CHARS),
+      summary:
+        summaryValue === undefined
+          ? undefined
+          : requireText(summaryValue, "summary", MAX_MEMORY_SUMMARY_CHARS),
+      title:
+        titleValue === undefined
+          ? undefined
+          : requireText(titleValue, "title", MAX_MEMORY_TITLE_CHARS),
+    });
     res.json(entry);
   })
 );

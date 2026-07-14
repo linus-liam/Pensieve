@@ -4,6 +4,7 @@ import type {
   MemoryEntry,
   ReflectionMessagePair,
   ReflectionSessionDetail,
+  UpdateMemoryEntryInput,
 } from "../types";
 import { getSupabaseAccessToken } from "../auth/supabaseClient";
 
@@ -53,6 +54,12 @@ export const api = {
   createReflectionSession: () =>
     request<ReflectionSessionDetail>("/reflection-sessions", { method: "POST" }),
 
+  startNewReflectionSession: () =>
+    request<ReflectionSessionDetail>("/reflection-sessions", {
+      method: "POST",
+      body: JSON.stringify({ replaceActive: true }),
+    }),
+
   getReflectionSession: (sessionId: string) =>
     request<ReflectionSessionDetail>(`/reflection-sessions/${sessionId}`),
 
@@ -77,10 +84,10 @@ export const api = {
   getMemoryEntry: (id: string, signal?: AbortSignal) =>
     request<MemoryEntry>(`/memory-entries/${id}`, { signal }),
 
-  updateMemoryEntry: (id: string, rawInput: string) =>
+  updateMemoryEntry: (id: string, input: UpdateMemoryEntryInput) =>
     request<MemoryEntry>(`/memory-entries/${id}`, {
       method: "PATCH",
-      body: JSON.stringify({ rawInput }),
+      body: JSON.stringify(input),
     }),
 
   deleteMemoryEntry: (id: string) =>

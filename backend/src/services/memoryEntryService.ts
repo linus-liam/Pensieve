@@ -55,17 +55,31 @@ export async function createMemoryEntry(
 export async function updateMemoryEntry(
   userId: string,
   id: string,
-  rawInput: string
+  input: {
+    rawInput?: string;
+    summary?: string;
+    title?: string;
+  }
 ): Promise<MemoryEntry> {
-  await getMemoryEntry(userId, id);
-  const aiSummary = await summarizeMemory(rawInput);
+  const current = await getMemoryEntry(userId, id);
+  const rawInput = input.rawInput ?? current.raw_input;
+  const aiSummary =
+    input.summary ??
+    (input.rawInput !== undefined && input.rawInput !== current.raw_input
+      ? await summarizeMemory(rawInput)
+      : current.ai_summary);
+  const title =
+    input.title ??
+    (current.title === current.ai_summary && aiSummary !== current.ai_summary
+      ? aiSummary
+      : current.title);
 
   const { rows } = await pool.query<MemoryEntry>(
     `UPDATE memory_entries
-     SET raw_input = $1, ai_summary = $2
-     WHERE id = $3 AND user_id = $4
+     SET raw_input = $1, ai_summary = $2, title = $3
+     WHERE id = $4 AND user_id = $5
      RETURNING id, user_id, session_id, title, raw_input, ai_summary, created_at, updated_at`,
-    [rawInput, aiSummary, id, userId]
+    [rawInput, aiSummary, title, id, userId]
   );
 
   const entry = rows[0];

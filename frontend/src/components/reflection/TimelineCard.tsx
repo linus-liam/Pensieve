@@ -1,58 +1,38 @@
-import { Card, Group, Image, Stack, Text, Title } from "@mantine/core";
+import { Box, Group, Stack, Text, Title } from "@mantine/core";
 import type { Memory } from "../../types";
-import { MemoryTag } from "./MemoryTag";
-import { SourceBadge } from "./SourceBadge";
 
 interface TimelineCardProps {
   memory: Memory;
-  muted?: boolean;
   onOpen: () => void;
 }
 
-export function TimelineCard({ memory, muted = false, onOpen }: TimelineCardProps) {
+export function TimelineCard({ memory, onOpen }: TimelineCardProps) {
   return (
-    <Card
+    <Box
+      aria-label={`${memory.title}, ${memory.time}`}
+      className="memory-row"
       component="a"
       href={`#memory/${encodeURIComponent(memory.id)}`}
-      aria-label={`Open memory: ${memory.title} ${memory.time}`}
-      className="timeline-card"
-      opacity={muted ? 0.78 : 1}
-      p="md"
-      radius="md"
-      shadow="none"
-      withBorder
-      onClick={onOpen}
+      onClick={(event) => {
+        event.preventDefault();
+        onOpen();
+      }}
     >
-      <Stack gap="sm">
-        <Group gap="xs" justify="space-between">
-          <Text c="dimmed" component="time" size="sm">
-            {memory.time}
-          </Text>
-          <Group gap="xs" wrap="nowrap">
-            <SourceBadge label={memory.source} type={memory.sourceType} />
-            <Text className="timeline-card__action" fw={600} size="sm">
-              Open memory
-            </Text>
-          </Group>
-        </Group>
-
-        {memory.image ? (
-          <Image alt={memory.imageAlt ?? ""} radius="sm" src={memory.image} />
-        ) : null}
-
-        <Stack gap={4}>
-          <Title order={3} size="h4">
+      <Group align="flex-start" gap="lg" justify="space-between" wrap="nowrap">
+        <Stack className="memory-row__copy" gap={6}>
+          <Title className="memory-row__title" order={3} size="h4">
             {memory.title}
           </Title>
-          <Text>{memory.summary}</Text>
+          <Text className="memory-row__summary" lineClamp={2}>
+            {memory.summary}
+          </Text>
         </Stack>
-
-        <Group aria-label="Memory tags" gap="xs">
-          {memory.tags.map((tag) => (
-            <MemoryTag key={tag} label={tag} />
-          ))}
-        </Group>
-      </Stack>
-    </Card>
+        <Stack align="flex-end" className="memory-row__meta" gap="sm">
+          <Text className="memory-row__time" component="time" size="xs">
+            {memory.time}
+          </Text>
+        </Stack>
+      </Group>
+    </Box>
   );
 }

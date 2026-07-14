@@ -61,13 +61,26 @@ export async function getActiveReflectionSession(
   return rows[0] ? getReflectionSession(userId, rows[0].id) : null;
 }
 
-export async function createReflectionSession(userId: string): Promise<ReflectionSessionDetail> {
-  const existing = await getActiveReflectionSession(userId);
-  if (existing) return existing;
+export async function createReflectionSession(
+  userId: string,
+  options: { replaceActive?: boolean } = {}
+): Promise<ReflectionSessionDetail> {
+  if (!options.replaceActive) {
+    const existing = await getActiveReflectionSession(userId);
+    if (existing) return existing;
+  }
 
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+    if (options.replaceActive) {
+      await client.query(
+        `UPDATE reflection_sessions
+         SET status = 'archived', updated_at = NOW()
+         WHERE user_id = $1 AND status = 'active'`,
+        [userId]
+      );
+    }
     const sessionResult = await client.query<ReflectionSession>(
       `INSERT INTO reflection_sessions (user_id)
        VALUES ($1)
@@ -85,7 +98,7 @@ export async function createReflectionSession(userId: string): Promise<Reflectio
     return { session, messages: messageResult.rows };
   } catch (error) {
     await client.query("ROLLBACK");
-    if ((error as { code?: string }).code === "23505") {
+    if (!options.replaceActive && (error as { code?: string }).code === "23505") {
       const active = await getActiveReflectionSession(userId);
       if (active) return active;
     }
@@ -229,11 +242,7 @@ export async function confirmReflectionMemory(input: {
       [assistantMessageId, sessionId, userId]
     );
     const assistantMessage = messageResult.rows[0];
-    if (
-      !assistantMessage ||
-      assistantMessage.metadata.state !== "proposal_ready" ||
-      !assistantMessage.metadata.memoryProposal
-    ) {
+    if (!assistantMessage || !assistantMessage.metadata.memoryProposal) {
       throw new AppError(400, "assistant message has no memory proposal", "invalid_proposal");
     }
     if (assistantMessage.metadata.proposalState !== "pending") {
