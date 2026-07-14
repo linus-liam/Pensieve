@@ -79,8 +79,13 @@ backend on `3001`.
 - `GET /api/memory-entries` lists memories newest first.
 - `POST /api/memory-entries` saves `rawInput`, generates `ai_summary`, and stores both.
 - `GET /api/memory-entries/:id` opens one memory.
-- `PATCH /api/memory-entries/:id` updates `rawInput` and regenerates the summary.
+- `PATCH /api/memory-entries/:id` updates `rawInput`, `title`, and/or `summary`; changing only
+  `rawInput` regenerates the summary.
 - `DELETE /api/memory-entries/:id` removes a memory.
+
+Reflection sessions can be resumed with `GET /api/reflection-sessions/active`. Posting
+`{ "replaceActive": true }` to `POST /api/reflection-sessions` archives an unfinished
+conversation and starts a fresh reflection.
 
 All memory endpoints require `Authorization: Bearer <supabase_access_token>`.
 The backend verifies that token with Supabase Auth and scopes every memory query

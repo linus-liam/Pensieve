@@ -69,10 +69,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     setError(null);
 
+    const redirectTo = import.meta.env.VITE_AUTH_REDIRECT_URL?.trim() || window.location.origin;
+
     const { error: signInError } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: window.location.origin,
+        redirectTo,
       },
     });
 

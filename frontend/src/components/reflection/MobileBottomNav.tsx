@@ -32,8 +32,8 @@ export function MobileBottomNav({ activePage, onNavigate }: MobileBottomNavProps
             type="button"
             onClick={() => onNavigate(value)}
           >
-            <Icon aria-hidden="true" size={18} strokeWidth={1.9} />
-            <span>{label}</span>
+            <Icon aria-hidden="true" size={19} strokeWidth={1.8} />
+            <span className="mobile-bottom-nav__label">{label}</span>
           </button>
         );
       })}

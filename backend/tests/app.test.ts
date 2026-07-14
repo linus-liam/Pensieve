@@ -9,6 +9,7 @@ const runDbTests = testDatabaseUrl ? describe : describe.skip;
 
 const aiMocks = vi.hoisted(() => ({
   acknowledgeMemory: vi.fn(),
+  continueReflection: vi.fn(),
   summarizeMemory: vi.fn(),
 }));
 
@@ -52,6 +53,7 @@ runDbTests("memory entries API", () => {
 
   beforeEach(async () => {
     aiMocks.acknowledgeMemory.mockReset();
+    aiMocks.continueReflection.mockReset();
     aiMocks.summarizeMemory.mockReset();
     aiMocks.acknowledgeMemory.mockResolvedValue("I hear how much that mattered.");
     authMocks.getUser.mockReset();
@@ -66,7 +68,7 @@ runDbTests("memory entries API", () => {
 
       return { data: { user: null }, error: new Error("Invalid token") };
     });
-    await pool.query("TRUNCATE memory_entries RESTART IDENTITY CASCADE");
+    await pool.query("TRUNCATE reflection_sessions, memory_entries RESTART IDENTITY CASCADE");
   });
 
   afterAll(async () => {
@@ -151,6 +153,28 @@ runDbTests("memory entries API", () => {
       .get(`/api/memory-entries/${created.body.id}`)
       .set("Authorization", `Bearer ${userAToken}`)
       .expect(404);
+  });
+
+  it("edits memory titles and summaries without an unnecessary AI request", async () => {
+    aiMocks.summarizeMemory.mockResolvedValue("Original summary.");
+    const created = await request(app)
+      .post("/api/memory-entries")
+      .set("Authorization", `Bearer ${userAToken}`)
+      .send({ rawInput: "Original memory" })
+      .expect(201);
+
+    const updated = await request(app)
+      .patch(`/api/memory-entries/${created.body.id}`)
+      .set("Authorization", `Bearer ${userAToken}`)
+      .send({ title: "A clearer title", summary: "A carefully revised summary." })
+      .expect(200);
+
+    expect(updated.body).toMatchObject({
+      title: "A clearer title",
+      ai_summary: "A carefully revised summary.",
+      raw_input: "Original memory",
+    });
+    expect(aiMocks.summarizeMemory).toHaveBeenCalledTimes(1);
   });
 
   it("requires a valid Supabase session", async () => {
@@ -249,5 +273,299 @@ runDbTests("memory entries API", () => {
       .set("Authorization", `Bearer ${userAToken}`)
       .expect(400);
     expect(response.body.code).toBe("invalid_uuid");
+  });
+
+  it("creates and resumes one active reflection session", async () => {
+    const created = await request(app)
+      .post("/api/reflection-sessions")
+      .set("Authorization", `Bearer ${userAToken}`)
+      .expect(201);
+
+    expect(created.body.session).toMatchObject({
+      user_id: userAId,
+      status: "active",
+      title: "Untitled reflection",
+    });
+    expect(created.body.messages).toHaveLength(1);
+    expect(created.body.messages[0]).toMatchObject({
+      role: "assistant",
+      content: "I'm here. What feels worth remembering right now?",
+    });
+
+    const resumed = await request(app)
+      .get("/api/reflection-sessions/active")
+      .set("Authorization", `Bearer ${userAToken}`)
+      .expect(200);
+
+    expect(resumed.body.session.id).toBe(created.body.session.id);
+    expect(resumed.body.messages).toEqual(created.body.messages);
+  });
+
+  it("archives an unfinished reflection when the user intentionally starts over", async () => {
+    const first = await request(app)
+      .post("/api/reflection-sessions")
+      .set("Authorization", `Bearer ${userAToken}`)
+      .expect(201);
+    const replacement = await request(app)
+      .post("/api/reflection-sessions")
+      .set("Authorization", `Bearer ${userAToken}`)
+      .send({ replaceActive: true })
+      .expect(201);
+
+    expect(replacement.body.session.id).not.toBe(first.body.session.id);
+    expect(replacement.body.session.status).toBe("active");
+
+    const archived = await request(app)
+      .get(`/api/reflection-sessions/${first.body.session.id}`)
+      .set("Authorization", `Bearer ${userAToken}`)
+      .expect(200);
+    expect(archived.body.session.status).toBe("archived");
+  });
+
+  it("posts a reflection message idempotently and stores both turns", async () => {
+    aiMocks.continueReflection.mockResolvedValue({
+      state: "exploring",
+      reply: "What do you remember seeing when that happened?",
+      memoryProposal: null,
+    });
+    const created = await request(app)
+      .post("/api/reflection-sessions")
+      .set("Authorization", `Bearer ${userAToken}`)
+      .expect(201);
+    const body = {
+      clientMessageId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+      content: "Dad laughed when the tent fell down.",
+    };
+
+    const first = await request(app)
+      .post(`/api/reflection-sessions/${created.body.session.id}/messages`)
+      .set("Authorization", `Bearer ${userAToken}`)
+      .send(body)
+      .expect(201);
+
+    expect(first.body.replayed).toBe(false);
+    expect(first.body.userMessage).toMatchObject({
+      client_message_id: body.clientMessageId,
+      content: body.content,
+      role: "user",
+    });
+    expect(first.body.assistantMessage).toMatchObject({
+      content: "What do you remember seeing when that happened?",
+      role: "assistant",
+      metadata: { state: "exploring" },
+    });
+
+    const replay = await request(app)
+      .post(`/api/reflection-sessions/${created.body.session.id}/messages`)
+      .set("Authorization", `Bearer ${userAToken}`)
+      .send(body)
+      .expect(200);
+
+    expect(replay.body).toEqual({ ...first.body, replayed: true });
+    expect(aiMocks.continueReflection).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps a user message when AI fails and retries without duplicating it", async () => {
+    aiMocks.continueReflection
+      .mockRejectedValueOnce(new AppError(503, "AI provider unavailable", "ai_unavailable"))
+      .mockResolvedValueOnce({
+        state: "exploring",
+        reply: "What stood out most clearly?",
+        memoryProposal: null,
+      });
+    const created = await request(app)
+      .post("/api/reflection-sessions")
+      .set("Authorization", `Bearer ${userAToken}`)
+      .expect(201);
+    const path = `/api/reflection-sessions/${created.body.session.id}/messages`;
+    const body = {
+      clientMessageId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+      content: "I remember the room being very quiet.",
+    };
+
+    await request(app)
+      .post(path)
+      .set("Authorization", `Bearer ${userAToken}`)
+      .send(body)
+      .expect(503);
+
+    const afterFailure = await request(app)
+      .get(`/api/reflection-sessions/${created.body.session.id}`)
+      .set("Authorization", `Bearer ${userAToken}`)
+      .expect(200);
+    expect(afterFailure.body.messages.filter((message: { role: string }) => message.role === "user"))
+      .toHaveLength(1);
+
+    await request(app)
+      .post(path)
+      .set("Authorization", `Bearer ${userAToken}`)
+      .send(body)
+      .expect(201);
+
+    const afterRetry = await request(app)
+      .get(`/api/reflection-sessions/${created.body.session.id}`)
+      .set("Authorization", `Bearer ${userAToken}`)
+      .expect(200);
+    expect(afterRetry.body.messages.filter((message: { role: string }) => message.role === "user"))
+      .toHaveLength(1);
+    expect(afterRetry.body.messages.filter((message: { role: string }) => message.role === "assistant"))
+      .toHaveLength(2);
+  });
+
+  it("does not expose another user's reflection session", async () => {
+    const created = await request(app)
+      .post("/api/reflection-sessions")
+      .set("Authorization", `Bearer ${userAToken}`)
+      .expect(201);
+
+    await request(app)
+      .get(`/api/reflection-sessions/${created.body.session.id}`)
+      .set("Authorization", `Bearer ${userBToken}`)
+      .expect(404);
+
+    expect(aiMocks.continueReflection).not.toHaveBeenCalled();
+  });
+
+  it("upgrades an existing reflection message table missing idempotency columns", async () => {
+    await pool.query(
+      "ALTER TABLE reflection_messages DROP COLUMN client_message_id, DROP COLUMN reply_to_message_id"
+    );
+
+    await expect(pool.query(schemaSql)).resolves.toBeTruthy();
+
+    const columns = await pool.query<{ column_name: string }>(
+      `SELECT column_name
+       FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name = 'reflection_messages'`
+    );
+    expect(columns.rows.map((row) => row.column_name)).toEqual(
+      expect.arrayContaining(["client_message_id", "reply_to_message_id"])
+    );
+  });
+
+  it("saves the approved proposal exactly without another AI call", async () => {
+    aiMocks.continueReflection.mockImplementationOnce(
+      async (messages: Array<{ id: string; role: string; content: string }>) => {
+        const userMessage = [...messages].reverse().find((message) => message.role === "user");
+        return {
+          state: "proposal_ready",
+          reply: "That feels like a memory worth holding onto.",
+          memoryProposal: {
+            title: "The Collapsed Tent",
+            summary: "I remember Dad laughing when our tent collapsed.",
+            evidence: [
+              {
+                userMessageId: userMessage?.id,
+                excerpt: "Dad laughed when our tent collapsed",
+              },
+            ],
+          },
+        };
+      }
+    );
+    const created = await request(app)
+      .post("/api/reflection-sessions")
+      .set("Authorization", `Bearer ${userAToken}`)
+      .expect(201);
+    const turn = await request(app)
+      .post(`/api/reflection-sessions/${created.body.session.id}/messages`)
+      .set("Authorization", `Bearer ${userAToken}`)
+      .send({
+        clientMessageId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+        content: "Dad laughed when our tent collapsed, and I felt completely safe.",
+      })
+      .expect(201);
+
+    const saved = await request(app)
+      .post(`/api/reflection-sessions/${created.body.session.id}/memory`)
+      .set("Authorization", `Bearer ${userAToken}`)
+      .send({
+        assistantMessageId: turn.body.assistantMessage.id,
+        title: "Camping with Dad",
+        summary: "I remember Dad laughing when our tent collapsed.",
+      })
+      .expect(201);
+
+    expect(saved.body).toMatchObject({
+      user_id: userAId,
+      session_id: created.body.session.id,
+      title: "Camping with Dad",
+      ai_summary: "I remember Dad laughing when our tent collapsed.",
+    });
+    expect(saved.body.raw_input).toContain("Dad laughed when our tent collapsed");
+    expect(aiMocks.continueReflection).toHaveBeenCalledTimes(1);
+    expect(aiMocks.summarizeMemory).not.toHaveBeenCalled();
+    expect(aiMocks.acknowledgeMemory).not.toHaveBeenCalled();
+
+    const detail = await request(app)
+      .get(`/api/reflection-sessions/${created.body.session.id}`)
+      .set("Authorization", `Bearer ${userAToken}`)
+      .expect(200);
+    expect(detail.body.session.status).toBe("completed");
+
+    const duplicate = await request(app)
+      .post(`/api/reflection-sessions/${created.body.session.id}/memory`)
+      .set("Authorization", `Bearer ${userAToken}`)
+      .send({
+        assistantMessageId: turn.body.assistantMessage.id,
+        title: "Camping with Dad",
+        summary: "I remember Dad laughing when our tent collapsed.",
+      })
+      .expect(409);
+    expect(duplicate.body.code).toBe("proposal_handled");
+  });
+
+  it("saves a pending proposal created before reflection state metadata was added", async () => {
+    aiMocks.continueReflection.mockImplementationOnce(
+      async (messages: Array<{ id: string; role: string; content: string }>) => {
+        const userMessage = [...messages].reverse().find((message) => message.role === "user");
+        return {
+          state: "proposal_ready",
+          reply: "That feels like a memory worth holding onto.",
+          memoryProposal: {
+            title: "The Collapsed Tent",
+            summary: "I remember Dad laughing when our tent collapsed.",
+            evidence: [
+              {
+                userMessageId: userMessage?.id,
+                excerpt: "Dad laughed when our tent collapsed",
+              },
+            ],
+          },
+        };
+      }
+    );
+    const created = await request(app)
+      .post("/api/reflection-sessions")
+      .set("Authorization", `Bearer ${userAToken}`)
+      .expect(201);
+    const turn = await request(app)
+      .post(`/api/reflection-sessions/${created.body.session.id}/messages`)
+      .set("Authorization", `Bearer ${userAToken}`)
+      .send({
+        clientMessageId: "ffffffff-ffff-4fff-8fff-ffffffffffff",
+        content: "Dad laughed when our tent collapsed, and I felt completely safe.",
+      })
+      .expect(201);
+
+    await pool.query(
+      "UPDATE reflection_messages SET metadata = metadata - 'state' WHERE id = $1",
+      [turn.body.assistantMessage.id]
+    );
+
+    const saved = await request(app)
+      .post(`/api/reflection-sessions/${created.body.session.id}/memory`)
+      .set("Authorization", `Bearer ${userAToken}`)
+      .send({
+        assistantMessageId: turn.body.assistantMessage.id,
+        title: "Camping with Dad",
+        summary: "I remember Dad laughing when our tent collapsed.",
+      })
+      .expect(201);
+
+    expect(saved.body).toMatchObject({
+      session_id: created.body.session.id,
+      title: "Camping with Dad",
+    });
   });
 });

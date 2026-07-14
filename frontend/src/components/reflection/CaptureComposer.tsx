@@ -1,10 +1,27 @@
-import { useEffect, useMemo, useRef } from "react";
-import { Box, Button, Group, Paper, Stack, Text, Textarea, Title } from "@mantine/core";
+import { useEffect, useRef, useState } from "react";
+import {
+  ActionIcon,
+  Box,
+  Button,
+  Group,
+  Modal,
+  Stack,
+  Text,
+  Textarea,
+  Title,
+} from "@mantine/core";
+import { ArrowUp, Plus, RotateCcw } from "lucide-react";
+import type { MemoryProposal } from "../../types";
+import { MemoryProposalCard } from "./MemoryProposalCard";
 
 export interface CaptureChatMessage {
   id: string;
+  clientMessageId?: string;
   role: "assistant" | "user";
   content: string;
+  proposal?: MemoryProposal;
+  proposalStatus?: "deferred" | "pending" | "saved";
+  savedMemoryId?: string;
   status?: "sending" | "error";
 }
 
@@ -12,25 +29,40 @@ interface CaptureComposerProps {
   value: string;
   canSave: boolean;
   messages: CaptureChatMessage[];
+  proposalSavingId: string | null;
   saving: boolean;
+  startingNew: boolean;
   onChange: (value: string) => void;
+  onChangeProposal: (messageId: string, proposal: MemoryProposal) => void;
+  onDismissProposal: (messageId: string) => void;
+  onRestoreProposal: (messageId: string) => void;
+  onRetry: () => void;
+  onSaveProposal: (messageId: string) => void;
   onSave: () => void;
-}
-
-function wordCount(text: string) {
-  return text.trim().split(/\s+/).filter(Boolean).length;
+  onStartNew: () => void;
+  onViewMemory: (memoryId: string) => void;
 }
 
 export function CaptureComposer({
   value,
   canSave,
   messages,
+  proposalSavingId,
   saving,
+  startingNew,
   onChange,
+  onChangeProposal,
+  onDismissProposal,
+  onRestoreProposal,
+  onRetry,
+  onSaveProposal,
   onSave,
+  onStartNew,
+  onViewMemory,
 }: CaptureComposerProps) {
-  const words = useMemo(() => wordCount(value), [value]);
   const messagesRef = useRef<HTMLDivElement>(null);
+  const [newReflectionOpen, setNewReflectionOpen] = useState(false);
+  const hasUserMessages = messages.some((message) => message.role === "user");
 
   useEffect(() => {
     const messageList = messagesRef.current;
@@ -43,114 +75,177 @@ export function CaptureComposer({
   }, [messages, saving]);
 
   return (
-    <section aria-label="Capture chat">
-      <Stack gap="sm">
-        <Title order={2} size="h2">
-          Capture
-        </Title>
+    <section aria-labelledby="capture-heading" className="capture-workspace">
+      <Stack gap={0} h="100%">
+        <header className="capture-workspace__header">
+          <Group align="center" justify="space-between" wrap="nowrap">
+            <Title className="capture-workspace__title" id="capture-heading" order={1}>
+              Capture a memory
+            </Title>
+            {hasUserMessages ? (
+              <Button
+                aria-label="New reflection"
+                className="button-secondary capture-workspace__new"
+                disabled={startingNew || saving}
+                leftSection={<Plus aria-hidden="true" size={16} />}
+                variant="subtle"
+                onClick={() => setNewReflectionOpen(true)}
+              >
+                New reflection
+              </Button>
+            ) : null}
+          </Group>
+        </header>
 
-        <Paper
-          aria-label="Memory chat"
-          p="md"
-          radius="md"
-          shadow="none"
-          withBorder
+        <Box
+          ref={messagesRef}
+          aria-label="Memory capture conversation"
+          aria-live="polite"
+          className="capture-conversation"
+          role="log"
         >
-          <Stack gap="md">
-            <Box
-              ref={messagesRef}
-              aria-label="Memory capture conversation"
-              aria-live="polite"
-              mah="min(54vh, 520px)"
-              pr={4}
-              role="log"
-              style={{ overflowY: "auto" }}
-            >
-              <Stack gap="sm">
-                {messages.map((message) => (
-                  <Box
-                    className={[
-                      "capture-chat__bubble",
-                      `capture-chat__bubble--${message.role}`,
-                      message.status === "error" ? "capture-chat__bubble--error" : "",
-                    ]
-                      .filter(Boolean)
-                      .join(" ")}
-                    key={message.id}
-                  >
-                    <Text className="capture-chat__speaker" fw={600} size="xs">
-                      {message.role === "assistant" ? "Pensieve" : "You"}
-                    </Text>
-                    <Text size="sm">{message.content}</Text>
-                    {message.status ? (
-                      <Text className="capture-chat__status" size="xs">
-                        {message.status === "sending" ? "Saving..." : "Not saved"}
-                      </Text>
-                    ) : null}
-                  </Box>
-                ))}
-
-                {saving ? (
-                  <Box className="capture-chat__bubble capture-chat__bubble--assistant">
-                    <Text className="capture-chat__speaker" fw={600} size="xs">
-                      Pensieve
-                    </Text>
-                    <Text c="dimmed" size="sm">
-                      Thinking...
-                    </Text>
-                  </Box>
+          <Stack gap="lg">
+            {messages.map((message) => (
+              <Box
+                className={`capture-message capture-message--${message.role}`}
+                data-status={message.status}
+                key={message.id}
+              >
+                {message.role === "assistant" ? (
+                  <span aria-hidden="true" className="capture-message__mark" />
                 ) : null}
-              </Stack>
-            </Box>
+                <Text className="capture-message__text">{message.content}</Text>
+                {message.status === "sending" ? (
+                  <Text className="capture-message__status" role="status" size="xs">
+                    Sending…
+                  </Text>
+                ) : null}
+                {message.status === "error" ? (
+                  <Group className="capture-message__error" gap="xs" mt={6}>
+                    <Text c="red.8" size="xs">
+                      Not sent
+                    </Text>
+                    <Button
+                      className="button-secondary"
+                      leftSection={<RotateCcw aria-hidden="true" size={12} />}
+                      size="compact-xs"
+                      variant="subtle"
+                      onClick={onRetry}
+                    >
+                      Try again
+                    </Button>
+                  </Group>
+                ) : null}
+                {message.proposal && message.proposalStatus === "deferred" ? (
+                  <Group
+                    className="memory-proposal-paused"
+                    gap="sm"
+                    justify="space-between"
+                    mt="lg"
+                  >
+                    <Text role="status" size="sm">Memory suggestion paused</Text>
+                    <Button
+                      className="button-secondary"
+                      size="compact-sm"
+                      variant="subtle"
+                      onClick={() => onRestoreProposal(message.id)}
+                    >
+                      Review suggestion
+                    </Button>
+                  </Group>
+                ) : message.proposal ? (
+                  <MemoryProposalCard
+                    messageId={message.id}
+                    proposal={message.proposal}
+                    saved={message.proposalStatus === "saved"}
+                    savedMemoryId={message.savedMemoryId}
+                    saving={proposalSavingId === message.id}
+                    startingNew={startingNew}
+                    onChange={(proposal) => onChangeProposal(message.id, proposal)}
+                    onDismiss={() => onDismissProposal(message.id)}
+                    onSave={() => onSaveProposal(message.id)}
+                    onStartNew={onStartNew}
+                    onViewMemory={onViewMemory}
+                  />
+                ) : null}
+              </Box>
+            ))}
 
-            <Box
-              component="form"
-              pt="md"
-              style={{ borderTop: "1px solid var(--mantine-color-gray-2)" }}
-              onSubmit={(event) => {
-                event.preventDefault();
-                onSave();
+          </Stack>
+        </Box>
+
+        <Box
+          className="capture-composer"
+          component="form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            onSave();
+          }}
+        >
+          <div className="capture-composer__field">
+            <Textarea
+              aria-label="Message to Pensieve"
+              placeholder="Share what you remember…"
+              rightSection={
+                <ActionIcon
+                  aria-label="Send message"
+                  className="capture-composer__send"
+                  disabled={!canSave || saving}
+                  loading={saving}
+                  radius="xl"
+                  size={44}
+                  type="submit"
+                >
+                  <ArrowUp aria-hidden="true" size={17} strokeWidth={2} />
+                </ActionIcon>
+              }
+              rightSectionWidth={60}
+              rightSectionPointerEvents="all"
+              rows={1}
+              value={value}
+              onChange={(event) => onChange(event.currentTarget.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+                  event.preventDefault();
+                  onSave();
+                }
+              }}
+            />
+          </div>
+        </Box>
+      </Stack>
+
+      <Modal
+        centered
+        opened={newReflectionOpen}
+        title="Start a new reflection?"
+        onClose={() => setNewReflectionOpen(false)}
+      >
+        <Stack gap="md">
+          <Text size="sm">
+            This ends the current conversation without saving it as a memory.
+          </Text>
+          <Group justify="flex-end">
+            <Button
+              className="button-secondary"
+              disabled={startingNew}
+              variant="default"
+              onClick={() => setNewReflectionOpen(false)}
+            >
+              Keep this reflection
+            </Button>
+            <Button
+              loading={startingNew}
+              onClick={() => {
+                setNewReflectionOpen(false);
+                onStartNew();
               }}
             >
-              <Stack gap="sm">
-                <Textarea
-                  aria-label="Message to save as a memory"
-                  placeholder="Write a memory..."
-                  rows={3}
-                  value={value}
-                  onChange={(event) => onChange(event.currentTarget.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" && !event.shiftKey) {
-                      event.preventDefault();
-                      onSave();
-                    }
-                  }}
-                />
-
-                <Group
-                  className="capture-composer__footer"
-                  gap="sm"
-                  justify="space-between"
-                >
-                  <Text c="dimmed" size="sm" style={{ whiteSpace: "nowrap" }}>
-                    {words} {words === 1 ? "word" : "words"}
-                  </Text>
-
-                  <Button
-                    aria-label="Send memory"
-                    disabled={!canSave || saving}
-                    loading={saving}
-                    radius="sm"
-                    type="submit"
-                  >
-                    Send
-                  </Button>
-                </Group>
-              </Stack>
-            </Box>
-          </Stack>
-        </Paper>
-      </Stack>
+              Start new reflection
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
     </section>
   );
 }

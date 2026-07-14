@@ -11,7 +11,7 @@ export async function listMemoryEntries(
   offset = 0
 ): Promise<MemoryEntry[]> {
   const { rows } = await pool.query<MemoryEntry>(
-    `SELECT id, user_id, raw_input, ai_summary, created_at, updated_at
+    `SELECT id, user_id, session_id, title, raw_input, ai_summary, created_at, updated_at
      FROM memory_entries
      WHERE user_id = $1
      ORDER BY created_at DESC
@@ -23,7 +23,7 @@ export async function listMemoryEntries(
 
 export async function getMemoryEntry(userId: string, id: string): Promise<MemoryEntry> {
   const { rows } = await pool.query<MemoryEntry>(
-    `SELECT id, user_id, raw_input, ai_summary, created_at, updated_at
+    `SELECT id, user_id, session_id, title, raw_input, ai_summary, created_at, updated_at
      FROM memory_entries
      WHERE id = $1 AND user_id = $2`,
     [id, userId]
@@ -44,10 +44,10 @@ export async function createMemoryEntry(
   ]);
 
   const { rows } = await pool.query<MemoryEntry>(
-    `INSERT INTO memory_entries (user_id, raw_input, ai_summary)
-     VALUES ($1, $2, $3)
-     RETURNING id, user_id, raw_input, ai_summary, created_at, updated_at`,
-    [userId, rawInput, aiSummary]
+    `INSERT INTO memory_entries (user_id, title, raw_input, ai_summary)
+     VALUES ($1, $2, $3, $2)
+     RETURNING id, user_id, session_id, title, raw_input, ai_summary, created_at, updated_at`,
+    [userId, aiSummary, rawInput]
   );
   return { ...rows[0], acknowledgement };
 }
@@ -55,17 +55,31 @@ export async function createMemoryEntry(
 export async function updateMemoryEntry(
   userId: string,
   id: string,
-  rawInput: string
+  input: {
+    rawInput?: string;
+    summary?: string;
+    title?: string;
+  }
 ): Promise<MemoryEntry> {
-  await getMemoryEntry(userId, id);
-  const aiSummary = await summarizeMemory(rawInput);
+  const current = await getMemoryEntry(userId, id);
+  const rawInput = input.rawInput ?? current.raw_input;
+  const aiSummary =
+    input.summary ??
+    (input.rawInput !== undefined && input.rawInput !== current.raw_input
+      ? await summarizeMemory(rawInput)
+      : current.ai_summary);
+  const title =
+    input.title ??
+    (current.title === current.ai_summary && aiSummary !== current.ai_summary
+      ? aiSummary
+      : current.title);
 
   const { rows } = await pool.query<MemoryEntry>(
     `UPDATE memory_entries
-     SET raw_input = $1, ai_summary = $2
-     WHERE id = $3 AND user_id = $4
-     RETURNING id, user_id, raw_input, ai_summary, created_at, updated_at`,
-    [rawInput, aiSummary, id, userId]
+     SET raw_input = $1, ai_summary = $2, title = $3
+     WHERE id = $4 AND user_id = $5
+     RETURNING id, user_id, session_id, title, raw_input, ai_summary, created_at, updated_at`,
+    [rawInput, aiSummary, title, id, userId]
   );
 
   const entry = rows[0];

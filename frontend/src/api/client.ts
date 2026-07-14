@@ -1,7 +1,25 @@
-import type { CapturedMemoryEntry, MemoryEntry } from "../types";
+import type {
+  CapturedMemoryEntry,
+  ConfirmReflectionMemoryInput,
+  MemoryEntry,
+  ReflectionMessagePair,
+  ReflectionSessionDetail,
+  UpdateMemoryEntryInput,
+} from "../types";
 import { getSupabaseAccessToken } from "../auth/supabaseClient";
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "/api";
+
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly code?: string
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const accessToken = await getSupabaseAccessToken();
@@ -20,7 +38,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const body = await res.json().catch(() => null);
     const message =
       typeof body?.error === "string" ? body.error : res.statusText || "Request failed";
-    throw new Error(message);
+    throw new ApiError(message, res.status, typeof body?.code === "string" ? body.code : undefined);
   }
 
   if (res.status === 204) return undefined as T;
@@ -29,6 +47,33 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   listMemoryEntries: () => request<MemoryEntry[]>("/memory-entries?limit=100"),
+
+  getActiveReflectionSession: () =>
+    request<ReflectionSessionDetail>("/reflection-sessions/active"),
+
+  createReflectionSession: () =>
+    request<ReflectionSessionDetail>("/reflection-sessions", { method: "POST" }),
+
+  startNewReflectionSession: () =>
+    request<ReflectionSessionDetail>("/reflection-sessions", {
+      method: "POST",
+      body: JSON.stringify({ replaceActive: true }),
+    }),
+
+  getReflectionSession: (sessionId: string) =>
+    request<ReflectionSessionDetail>(`/reflection-sessions/${sessionId}`),
+
+  sendReflectionMessage: (sessionId: string, content: string, clientMessageId: string) =>
+    request<ReflectionMessagePair>(`/reflection-sessions/${sessionId}/messages`, {
+      method: "POST",
+      body: JSON.stringify({ content, clientMessageId }),
+    }),
+
+  confirmReflectionMemory: (sessionId: string, input: ConfirmReflectionMemoryInput) =>
+    request<MemoryEntry>(`/reflection-sessions/${sessionId}/memory`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
 
   createMemoryEntry: (rawInput: string) =>
     request<CapturedMemoryEntry>("/memory-entries", {
@@ -39,10 +84,10 @@ export const api = {
   getMemoryEntry: (id: string, signal?: AbortSignal) =>
     request<MemoryEntry>(`/memory-entries/${id}`, { signal }),
 
-  updateMemoryEntry: (id: string, rawInput: string) =>
+  updateMemoryEntry: (id: string, input: UpdateMemoryEntryInput) =>
     request<MemoryEntry>(`/memory-entries/${id}`, {
       method: "PATCH",
-      body: JSON.stringify({ rawInput }),
+      body: JSON.stringify(input),
     }),
 
   deleteMemoryEntry: (id: string) =>
