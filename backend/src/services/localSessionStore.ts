@@ -6,7 +6,7 @@ import { AppError } from "../errors.js";
 import type { Revision } from "./localMemoryStore.js";
 
 export interface SessionMessage { id: string; role: "user" | "assistant"; content: string; created_at: string }
-export interface ReviewDraft { id: string; text: string; created_at: string; source_message_ids: string[] }
+export interface ReviewDraft { id: string; text: string; created_at: string; source_message_ids: string[]; author?: "user" }
 export interface SessionMemory extends Revision { source_session_id: string }
 export interface ReflectionSession {
   format: 1; id: string; created_at: string; updated_at: string;
@@ -103,7 +103,7 @@ export class LocalSessionStore {
   async exportMarkdown() {
     return (await this.list()).map(session => `## Reflection session ${session.id}\n\nStarted: ${session.created_at}\nStatus: ${session.status}\n\n` +
       session.messages.map(m => `### ${m.role} · ${m.created_at} · ${m.id}\n\n${m.content}\n`).join("\n") +
-      "\n### AI review drafts (unconfirmed interpretations)\n\n" + session.drafts.map(d => `${d.created_at} · ${d.id}\nSources: ${d.source_message_ids.join(", ")}\n\n${d.text}\n`).join("\n") +
+      "\n### Review drafts (unconfirmed interpretations)\n\n" + session.drafts.map(d => `${d.created_at} · ${d.id} · ${d.author === "user" ? "User" : "AI"}\nSources: ${d.source_message_ids.join(", ")}\n\n${d.text}\n`).join("\n") +
       "\n### User-confirmed memory history\n\n" + session.memory_revisions.map(r => `Revision ${r.revision} · ${r.action} · ${r.updated_at}\n\n${r.raw_input}\n`).join("\n")
     ).join("\n---\n\n");
   }

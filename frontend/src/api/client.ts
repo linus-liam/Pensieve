@@ -38,6 +38,7 @@ export const api = {
   appendMessage: (sessionId: string, id: string, content: string) => request<ReflectionSession>(`/sessions/${sessionId}/messages`, { method: "POST", body: JSON.stringify({ id, content }) }),
   reply: (sessionId: string, id: string, review = false) => request<ReflectionSession>(`/sessions/${sessionId}/respond`, { method: "POST", body: JSON.stringify({ id, review, cloudConsent: true }) }),
   confirmReview: (id: string, text: string, draftId: string | null) => request<ReflectionSession>(`/sessions/${id}/confirm`, { method: "POST", body: JSON.stringify({ text, draftId }) }),
+  saveReviewDraft: (id: string, text: string, draftId: string | null) => request<ReflectionSession>(`/sessions/${id}/review-draft`, { method: "POST", body: JSON.stringify({ text, draftId }) }),
   continueSession: (id: string) => request<ReflectionSession>(`/sessions/${id}/continue`, { method: "POST" }),
 
   localInfo: () => request<LocalInfo>("/local-info"),

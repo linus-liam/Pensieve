@@ -100,7 +100,31 @@ body {
   white-space: nowrap;
 }
 
+.reflection-transcript > summary {
+  color: var(--mantine-color-gray-6);
+  cursor: pointer;
+  font-size: var(--mantine-font-size-sm);
+  padding: 4px 0;
+}
+
+.reflection-transcript[open] > summary:not([hidden]) {
+  margin-bottom: 12px;
+}
+
+.reflection-review {
+  scroll-margin-block: 20px;
+  outline: none;
+}
+
+.reflection-review__actions {
+  flex-wrap: wrap;
+}
+
 @media (max-width: 47.99em) {
+  .reflection-review {
+    scroll-margin-block-end: calc(100px + env(safe-area-inset-bottom, 0px));
+  }
+
   .app-content {
     padding-bottom: calc(76px + env(safe-area-inset-bottom));
   }

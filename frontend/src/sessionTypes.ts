@@ -1,6 +1,6 @@
 import type { MemoryEntry } from "./types";
 export interface SessionMessage { id: string; role: "user" | "assistant"; content: string; created_at: string }
-export interface ReviewDraft { id: string; text: string; created_at: string; source_message_ids: string[] }
+export interface ReviewDraft { id: string; text: string; created_at: string; source_message_ids: string[]; author?: "user" }
 export interface ReflectionSession {
   id: string; created_at: string; updated_at: string; status: "active" | "review" | "completed";
   messages: SessionMessage[]; drafts: ReviewDraft[]; current_draft_id: string | null;

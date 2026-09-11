@@ -87,3 +87,30 @@ it("serializes concurrent AI attempts and preserves the full multi-turn context"
   await request(app).post(`/api/sessions/${id}/respond`).set(headers).send({ id: randomUUID(), cloudConsent: true });
   expect(reply.mock.calls[1][0].map((m: {content: string}) => m.content)).toEqual(["first", "可以再说一点。", "second"]);
 });
+it("keeps deferred review edits across restart without confirming or replacing the original AI draft", async () => {
+  const { app, reply } = setup(); const id = await create(app); await append(app, id);
+  const original = (await request(app).post(`/api/sessions/${id}/respond`).set(headers).send({ id: randomUUID(), cloudConsent: true }).expect(200)).body;
+  const body = { text: "修改后留待下次确认", draftId: original.current_draft_id };
+  await request(app).post(`/api/sessions/${id}/review-draft`).set(headers).send({ ...body, draftId: randomUUID() }).expect(409);
+  for (let n = 0; n < 2; n++) await request(app).post(`/api/sessions/${id}/review-draft`).set(headers).send(body).expect(200);
+  const restarted = setup().app;
+  const current = (await request(restarted).get(`/api/sessions/${id}`).set(headers).expect(200)).body;
+  expect(current.status).toBe("review");
+  expect(current.drafts).toHaveLength(2);
+  expect(current.drafts[0]).toEqual(original.drafts[0]);
+  expect(current.drafts[1]).toMatchObject({ text: body.text, author: "user", id: current.current_draft_id });
+  expect(current.messages).toEqual(original.messages);
+  expect((await request(restarted).get("/api/memory-entries").set(headers)).body).toEqual([]);
+  const exported = await request(restarted).get("/api/export").set(headers);
+  expect(exported.text).toContain(body.text); expect(exported.text).toContain("· User");
+  expect(reply).toHaveBeenCalledOnce();
+  await request(restarted).post(`/api/sessions/${id}/confirm`).set(headers).send({ text: body.text, draftId: current.current_draft_id }).expect(200);
+  await request(restarted).post(`/api/sessions/${id}/review-draft`).set(headers).send({ text: "late edit", draftId: current.current_draft_id }).expect(409);
+});
+it("can defer a handwritten review without a model", async () => {
+  const { app, reply } = setup(); const id = await create(app); await append(app, id);
+  const draft = (await request(app).post(`/api/sessions/${id}/review-draft`).set(headers).send({ draftId: null, text: "手写的暂定回顾" }).expect(200)).body;
+  expect(draft.status).toBe("review"); expect(draft.drafts[0].author).toBe("user");
+  expect(reply).not.toHaveBeenCalled();
+  expect((await request(app).get("/api/memory-entries").set(headers)).body).toEqual([]);
+});

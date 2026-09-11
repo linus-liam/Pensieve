@@ -76,6 +76,21 @@ export function createLocalApp(directory: string, token: string, ai: ReflectionA
     });
     res.json(result);
   }));
+  app.post("/api/sessions/:id/review-draft", asyncHandler(async (req, res) => {
+    const draftId = req.body?.draftId === null ? null : requireUuid(req.body?.draftId, "draft id");
+    const text = raw(req.body?.text, 20000);
+    res.json(await sessions.update(requireUuid(req.params.id, "id"), session => {
+      if (session.status === "completed") throw new AppError(409, "这段回顾已确认", "session_completed");
+      if (!session.messages.length) throw new AppError(400, "先留下这段聊天的内容", "empty_session");
+      const current = session.drafts.find(d => d.id === session.current_draft_id);
+      // A repeated save after a lost response keeps the same draft.
+      if (current?.text === text && current.author === "user") return;
+      if (draftId !== session.current_draft_id) throw new AppError(409, "回顾已更新，请重新查看", "stale_draft");
+      if (current?.text === text) return;
+      const draft = { id: randomUUID(), text, created_at: new Date().toISOString(), source_message_ids: session.messages.map(m => m.id), author: "user" as const };
+      session.drafts.push(draft); session.current_draft_id = draft.id; session.status = "review";
+    }));
+  }));
   app.post("/api/sessions/:id/confirm", asyncHandler(async (req, res) => {
     const draftId = req.body?.draftId === null ? null : requireUuid(req.body?.draftId, "draft id");
     res.json(await sessions.confirm(requireUuid(req.params.id, "id"), raw(req.body?.text, 20000), draftId));
