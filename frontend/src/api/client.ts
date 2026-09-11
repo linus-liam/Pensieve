@@ -1,4 +1,4 @@
-import type { ReflectionSession, SessionListItem, LocalInfo } from "../sessionTypes";
+import type { ReflectionSession, SessionListItem, LocalInfo, BackupStatus } from "../sessionTypes";
 import { localMode, localToken } from "../local";
 import type { CapturedMemoryEntry, MemoryEntry } from "../types";
 import { getSupabaseAccessToken } from "../auth/supabaseClient";
@@ -42,6 +42,7 @@ export const api = {
   continueSession: (id: string) => request<ReflectionSession>(`/sessions/${id}/continue`, { method: "POST" }),
 
   localInfo: () => request<LocalInfo>("/local-info"),
+  backup: () => request<BackupStatus>("/backups", { method: "POST" }),
   history: (id: string) => request<MemoryRevision[]>(`/memory-entries/${id}/history`),
   restore: (id: string) => request<MemoryEntry>(`/memory-entries/${id}/restore`, { method: "POST" }),
   exportMarkdown: async () => {

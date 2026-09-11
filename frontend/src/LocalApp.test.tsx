@@ -6,7 +6,7 @@ import { AuthProvider } from "./auth/AuthProvider";
 vi.mock("./local", () => ({ localMode: true, localToken: "local-test-token" }));
 const record = { id: "11111111-1111-4111-8111-111111111111", user_id: "local", raw_input: "旧日的理解", ai_summary: "旧日的理解", created_at: "2026-09-11T12:00:00Z", updated_at: "2026-09-11T12:00:00Z" };
 function json(data: unknown) { return new Response(JSON.stringify(data), { status: 200 }); }
-beforeEach(() => { window.history.pushState(null, "", "/"); });
+beforeEach(() => { window.localStorage.clear(); window.history.pushState(null, "", "/"); });
 afterEach(() => { vi.unstubAllGlobals(); });
 it("opens without cloud auth and saves exact text using the local credential", async () => {
   const fetch = vi.fn(async (url: string, init?: RequestInit) => {
@@ -16,10 +16,11 @@ it("opens without cloud auth and saves exact text using the local credential", a
   });
   vi.stubGlobal("fetch", fetch);
   render(<AuthProvider><App /></AuthProvider>);
-  expect(await screen.findByText(/存储目录：\/local\/memories/)).toBeInTheDocument();
+  expect(await screen.findByRole("heading", { name: "今天，想聊些什么？" })).toBeInTheDocument();
+  expect(screen.queryByText(/存储目录/)).not.toBeInTheDocument();
   expect(screen.queryByText("Continue with Google")).not.toBeInTheDocument();
   const user = userEvent.setup();
-  await user.click(screen.getByText("直接保存旧文字"));
+  await user.click(screen.getByText("留存已有文字"));
   await user.click(screen.getByRole("textbox", { name: "Message to save as a memory" }));
   await user.paste("  原文\n第二行  ");
   await user.click(screen.getByRole("button", { name: "Send memory" }));
@@ -39,7 +40,7 @@ it("searches local records and displays their revision history", async () => {
   render(<AuthProvider><App /></AuthProvider>);
   const user = userEvent.setup();
   const nav = await screen.findByRole("navigation", { name: "Main navigation" });
-  await user.click(within(nav).getByRole("button", { name: "Memories" }));
+  await user.click(within(nav).getByRole("button", { name: "记忆" }));
   await user.type(await screen.findByRole("textbox", { name: "搜索记忆" }), "不存在");
   await waitFor(() => expect(screen.queryByText("旧日的理解")).not.toBeInTheDocument());
   await user.clear(screen.getByRole("textbox", { name: "搜索记忆" }));
@@ -47,4 +48,23 @@ it("searches local records and displays their revision history", async () => {
   expect(await screen.findByText(/版本 1/)).toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "原文摘录（非 AI 总结）" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "归档记忆" })).toBeInTheDocument();
+});
+
+it("keeps storage and backup details in settings, and persists an explicit AI choice", async () => {
+  const fetch = vi.fn(async (url: string) => {
+    if (url.endsWith("/local-info")) return json({ directory: "/local/memories", aiEnabled: true, model: "test", backup: { directory: "/local/backups", lastBackupAt: null, count: 0, error: null } });
+    return json([]);
+  });
+  vi.stubGlobal("fetch", fetch);
+  render(<AuthProvider><App /></AuthProvider>);
+  const user = userEvent.setup();
+  const nav = await screen.findByRole("navigation", { name: "Main navigation" });
+  await user.click(within(nav).getByRole("button", { name: "设置" }));
+  expect(await screen.findByText("存储目录：/local/memories")).toBeInTheDocument();
+  await user.click(screen.getByRole("checkbox", { name: "使用 OpenAI 生成回复与回顾" }));
+  expect(window.localStorage.getItem("pensieve.cloud-ai-consent.v1")).toBe("enabled");
+  await user.click(screen.getByRole("checkbox", { name: "使用 OpenAI 生成回复与回顾" }));
+  expect(window.localStorage.getItem("pensieve.cloud-ai-consent.v1")).toBe("disabled");
+  await user.click(screen.getByRole("button", { name: "立即备份" }));
+  await waitFor(() => expect(fetch.mock.calls.some(([url]) => url.endsWith("/backups"))).toBe(true));
 });

@@ -1,4 +1,5 @@
 import { LocalReflection } from "./components/reflection/LocalReflection";
+import { LocalSettings } from "./components/reflection/LocalSettings";
 import type { LocalInfo } from "./sessionTypes";
 import { localMode } from "./local";
 import { pensieveTheme } from "./theme";
@@ -67,13 +68,13 @@ function getDayLabel(value: string) {
     a.getMonth() === b.getMonth() &&
     a.getDate() === b.getDate();
 
-  if (isSameDay(date, today)) return "Today";
-  if (isSameDay(date, yesterday)) return "Yesterday";
+  if (isSameDay(date, today)) return localMode ? "今天" : "Today";
+  if (isSameDay(date, yesterday)) return localMode ? "昨天" : "Yesterday";
 
   const diffMs = today.getTime() - date.getTime();
-  if (diffMs < 1000 * 60 * 60 * 24 * 7) return "This Week";
+  if (diffMs < 1000 * 60 * 60 * 24 * 7) return localMode ? "最近一周" : "This Week";
 
-  return new Intl.DateTimeFormat("en-US", {
+  return new Intl.DateTimeFormat(localMode ? "zh-CN" : "en-US", {
     month: "short",
     day: "numeric",
     year: today.getFullYear() === date.getFullYear() ? undefined : "numeric",
@@ -139,6 +140,8 @@ function AuthenticatedApp() {
   const [archived, setArchived] = useState(false);
   const [search, setSearch] = useState("");
   const [localInfo, setLocalInfo] = useState<LocalInfo | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   useEffect(() => {
     if (localMode) void api.localInfo().then(info => setLocalInfo(info)).catch(() => {});
   }, []);
@@ -232,10 +235,16 @@ function AuthenticatedApp() {
 
   const navigateFromNav = useCallback(
     (nextPage: NavPage) => {
+      if (localMode && nextPage === "capture" && page === "capture") return;
       navigate(nextPage);
     },
-    [navigate]
+    [navigate, page]
   );
+
+  const openHistory = () => {
+    if (page !== "capture") navigate("capture");
+    setHistoryOpen(true);
+  };
 
   const saveMemory = useCallback(async () => {
     const rawInput = localMode ? draft : draft.trim();
@@ -340,13 +349,15 @@ function AuthenticatedApp() {
             userEmail={user?.email ?? null}
             onNavigate={navigateFromNav}
             onSignOut={signOut}
+            onHistory={openHistory}
+            onSettings={() => setSettingsOpen(true)}
           />
         </AppShell.Navbar>
 
         <AppShell.Main className="app-content">
           <Container py="lg" size="sm">
             <Stack gap="md">
-              <Group className="account-bar" gap="sm" justify="space-between" wrap="nowrap">
+              {!localMode && <Group className="account-bar" gap="sm" justify="space-between" wrap="nowrap">
                 <Text c="dimmed" lineClamp={1} size="sm">
                   {localMode ? "聊天与历史保存在本机" : user?.email ?? "Google account"}
                 </Text>
@@ -359,12 +370,7 @@ function AuthenticatedApp() {
                 >
                   Sign out
                 </Button>}
-              </Group>
-
-              {localMode && <Stack gap={4}>
-                <Text size="xs" c="dimmed" style={{ overflowWrap: "anywhere" }}>存储目录：{localInfo?.directory || "正在连接本地存储…"}</Text>
-                <Button size="xs" variant="subtle" w="fit-content" onClick={() => { void api.exportMarkdown().catch(e => setError(e.message)); }}>导出全部记忆与历史（Markdown）</Button>
-              </Stack>}
+              </Group>}
 
               {page === "capture" ? (
                 <Stack gap="lg">
@@ -373,7 +379,7 @@ function AuthenticatedApp() {
                       {error}
                     </Alert>
                   ) : null}
-                  {localMode ? <LocalReflection info={localInfo} onConfirmed={() => void loadEntries()}>
+                  {localMode ? <LocalReflection info={localInfo} onConfirmed={() => void loadEntries()} historyOpen={historyOpen} onHistoryClose={() => setHistoryOpen(false)}>
                     <CaptureComposer canSave={canSave} messages={captureMessages} saving={saving} value={draft} onChange={setDraft} onSave={saveMemory} />
                   </LocalReflection> : <CaptureComposer
                     canSave={canSave}
@@ -390,10 +396,10 @@ function AuthenticatedApp() {
                 <Stack gap="md">
                   <Group justify="space-between" wrap="nowrap">
                     <Title order={2} size="h2">
-                      Memories
+                      {localMode ? "记忆" : "Memories"}
                     </Title>
                     <Button radius="sm" size="xs" variant="default" onClick={loadEntries}>
-                      Refresh
+                      {localMode ? "刷新" : "Refresh"}
                     </Button>
                   </Group>
 
@@ -415,7 +421,7 @@ function AuthenticatedApp() {
                   ) : null}
 
                   {!loading && memories.length === 0 ? (
-                    <Text c="dimmed">No memories saved yet.</Text>
+                    <Text c="dimmed">{localMode ? "确认过的回顾，会留在这里。" : "No memories saved yet."}</Text>
                   ) : null}
 
                   {memories.length > 0 ? (
@@ -454,7 +460,7 @@ function AuthenticatedApp() {
                     Back
                   </Button>
                   <Title order={2} size="h2">
-                    Memory detail
+                    {localMode ? "这段记忆" : "Memory detail"}
                   </Title>
                   {localMode && archived && selectedEntry && <Button onClick={() => { void api.restore(selectedEntry.id).then(() => { setArchived(false); navigate("memories"); }).catch(e => setError(e.message)); }}>恢复到记忆列表</Button>}
                   {selectedEntry?.source_session_id && <Button variant="light" onClick={() => {
@@ -477,7 +483,8 @@ function AuthenticatedApp() {
           </Container>
         </AppShell.Main>
 
-        <MobileBottomNav activePage={activeNavPage} onNavigate={navigateFromNav} />
+        <MobileBottomNav activePage={activeNavPage} onNavigate={navigateFromNav} onHistory={openHistory} onSettings={() => setSettingsOpen(true)} />
+        {localMode && <LocalSettings opened={settingsOpen} onClose={() => setSettingsOpen(false)} info={localInfo} onInfo={setLocalInfo} />}
       </AppShell>
     </>
   );

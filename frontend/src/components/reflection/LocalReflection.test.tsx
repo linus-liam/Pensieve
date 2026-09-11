@@ -11,7 +11,7 @@ const initial: ReflectionSession = { id: "11111111-1111-4111-8111-111111111111",
 const saved: ReflectionSession = { ...initial, messages: [{ id: "user-id", role: "user", content: "我对新计划有些犹豫", created_at: now }] };
 const review: ReflectionSession = { ...saved, status: "review", messages: [...saved.messages, { id: "assistant-id", role: "assistant", content: "这是一个暂时的理解。", created_at: now }], drafts: [{ id: "draft-id", text: "AI 的暂定回顾", created_at: now, source_message_ids: ["user-id"] }], current_draft_id: "draft-id" };
 beforeEach(() => {
-  vi.clearAllMocks(); window.history.replaceState(null, "", "#capture");
+  vi.clearAllMocks(); window.localStorage.clear(); window.history.replaceState(null, "", "#capture");
   vi.mocked(api.listSessions).mockResolvedValue([]);
   vi.mocked(api.createSession).mockResolvedValue(initial);
   vi.mocked(api.appendMessage).mockResolvedValue(saved);
@@ -21,11 +21,10 @@ function mount() { const confirmed = vi.fn(); render(<MantineProvider><LocalRefl
 it("requires opt-in before AI; records locally first, then lets the user edit and confirm a draft", async () => {
   const done = mount(); const user = userEvent.setup();
   await user.type(screen.getByLabelText("此刻想说的话"), "我对新计划有些犹豫");
-  await user.click(screen.getByRole("button", { name: "保存消息到本机" }));
-  expect(await screen.findByText("我对新计划有些犹豫")).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "发送" }));
   expect(api.reply).not.toHaveBeenCalled();
-  await user.click(screen.getByRole("checkbox"));
-  await user.click(screen.getByRole("button", { name: "生成 / 重试 AI 回复" }));
+  expect(api.appendMessage).not.toHaveBeenCalled();
+  await user.click(await screen.findByRole("button", { name: "开启 AI 并发送" }));
   const editor = await screen.findByRole("textbox", { name: "回顾正文" });
   expect(screen.queryByLabelText("此刻想说的话")).not.toBeInTheDocument();
   expect(screen.getByRole("region", { name: "先聊到这里" })).toHaveFocus();
@@ -80,8 +79,8 @@ it("keeps review edits on screen if saving for later fails", async () => {
   expect(api.confirmReview).not.toHaveBeenCalled();
 });
 it("keeps saved user text visible on AI failure and can retry without resending it", async () => {
+  window.localStorage.setItem("pensieve.cloud-ai-consent.v1", "enabled");
   mount(); const user = userEvent.setup();
-  await user.click(screen.getByRole("checkbox"));
   vi.mocked(api.reply).mockRejectedValueOnce(new Error("AI 暂时未能回复"));
   await user.type(screen.getByLabelText("此刻想说的话"), "我对新计划有些犹豫");
   await user.click(screen.getByRole("button", { name: /^发送$/ }));
@@ -90,4 +89,29 @@ it("keeps saved user text visible on AI failure and can retry without resending 
   await user.click(screen.getByRole("button", { name: "生成 / 重试 AI 回复" }));
   expect(await screen.findByRole("textbox", { name: "回顾正文" })).toHaveValue("AI 的暂定回顾");
   expect(api.appendMessage).toHaveBeenCalledOnce();
+});
+
+it("remembers a local-only choice and never calls AI on subsequent messages", async () => {
+  mount(); const user = userEvent.setup();
+  await user.type(screen.getByLabelText("此刻想说的话"), "合成原文");
+  await user.click(screen.getByRole("button", { name: "发送" }));
+  await user.click(await screen.findByRole("button", { name: "先只保存原文" }));
+  await screen.findByText("已保存到本机");
+  await user.type(screen.getByLabelText("此刻想说的话"), "合成后续");
+  await user.click(screen.getByRole("button", { name: "保存" }));
+  await waitFor(() => expect(api.appendMessage).toHaveBeenCalledTimes(2));
+  expect(api.reply).not.toHaveBeenCalled();
+  expect(window.localStorage.getItem("pensieve.cloud-ai-consent.v1")).toBe("disabled");
+  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+});
+it("opens a past chat from the dated history list", async () => {
+  vi.mocked(api.listSessions).mockResolvedValue([{ id: review.id, title: "合成过去的聊天", status: "review", updated_at: now, message_count: 2 }]);
+  vi.mocked(api.getSession).mockResolvedValue(review);
+  const close = vi.fn();
+  render(<MantineProvider><LocalReflection historyOpen onHistoryClose={close} info={null} onConfirmed={() => {}}>{null}</LocalReflection></MantineProvider>);
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole("button", { name: /合成过去的聊天/ }));
+  await waitFor(() => expect(close).toHaveBeenCalled());
+  expect(api.getSession).toHaveBeenCalledWith(review.id);
+  expect(window.location.hash).toContain(review.id);
 });

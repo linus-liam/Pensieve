@@ -9,8 +9,9 @@ import { asyncHandler } from "./middleware/asyncHandler.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { requireUuid } from "./utils/validation.js";
 import { AppError } from "./errors.js";
+import type { LocalBackups } from "./services/localBackups.js";
 
-export function createLocalApp(directory: string, token: string, ai: ReflectionAI = createReflectionAI()) {
+export function createLocalApp(directory: string, token: string, ai: ReflectionAI = createReflectionAI(), backups?: LocalBackups) {
   if (token.length < 32) throw new Error("Local access token must be at least 32 characters");
   const app = express();
   const store = new LocalMemoryStore(directory);
@@ -27,6 +28,12 @@ export function createLocalApp(directory: string, token: string, ai: ReflectionA
     next();
   });
   app.use(express.json({ limit: "2mb" }));
+  if (backups) app.use((req, res, next) => {
+    res.on("finish", () => {
+      if (["POST", "PATCH", "DELETE"].includes(req.method) && res.statusCode < 300 && req.path !== "/api/backups") backups.schedule();
+    });
+    next();
+  });
   function raw(value: unknown, max = 500000) {
     if (typeof value !== "string" || !value.trim()) throw new AppError(400, "请输入内容", "invalid_input");
     if (value.length > max) throw new AppError(413, `内容超过 ${max} 字符`, "input_too_large");
@@ -36,7 +43,12 @@ export function createLocalApp(directory: string, token: string, ai: ReflectionA
     try { return await sessions.get(id); }
     catch (error) { if (error instanceof AppError && error.status === 404) return null; throw error; }
   }
-  app.get("/api/local-info", (_req, res) => res.json({ directory, aiEnabled: ai.configured, model: ai.model, provider: "OpenAI" }));
+  app.get("/api/local-info", asyncHandler(async (_req, res) => res.json({ mode: "local", directory, aiEnabled: ai.configured, model: ai.model, provider: "OpenAI", backup: backups ? await backups.status() : null })));
+  app.post("/api/backups", asyncHandler(async (_req, res) => {
+    if (!backups) throw new AppError(503, "请从本机启动器开启自动备份", "backups_unavailable");
+    try { res.json(await backups.run()); }
+    catch { throw new AppError(503, "备份未完成，请检查磁盘空间或目录权限；原始数据仍在本机。", "backup_failed"); }
+  }));
   app.get("/api/export", asyncHandler(async (_req, res) => {
     res.type("text/markdown").attachment("pensieve-memories.md").send(await store.exportMarkdown() + "\n\n" + await sessions.exportMarkdown());
   }));
