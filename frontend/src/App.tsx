@@ -1,6 +1,7 @@
 import { LocalReflection } from "./components/reflection/LocalReflection";
 import type { LocalInfo } from "./sessionTypes";
 import { localMode } from "./local";
+import { pensieveTheme } from "./theme";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
@@ -484,7 +485,7 @@ function AuthenticatedApp() {
 
 export function App() {
   return (
-    <MantineProvider defaultColorScheme="light">
+    <MantineProvider theme={pensieveTheme} defaultColorScheme="light">
       <AuthGate>
         <AuthenticatedApp />
       </AuthGate>
