@@ -21,6 +21,7 @@
     "local": "node scripts/local.mjs",
     "start:local": "node scripts/start-local.mjs",
     "restore:local": "tsx backend/src/restoreLocal.ts",
-    "stop:local": "node scripts/stop-local.mjs"
+    "stop:local": "node scripts/stop-local.mjs",
+    "eval:reflection": "npm run eval:reflection --workspace backend --"
   }
 }
