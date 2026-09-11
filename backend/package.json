@@ -19,6 +19,7 @@
     "express": "^4.19.2",
     "express-rate-limit": "^8.5.2",
     "helmet": "^8.1.0",
+    "https-proxy-agent": "^7.0.6",
     "openai": "^4.77.0",
     "pg": "^8.11.5"
   },

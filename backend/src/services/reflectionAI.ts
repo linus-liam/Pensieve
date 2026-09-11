@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { HttpsProxyAgent } from "https-proxy-agent";
 import { AppError } from "../errors.js";
 import type { SessionMessage } from "./localSessionStore.js";
 
@@ -26,7 +27,11 @@ export function createReflectionAI(): ReflectionAI {
       if (!key || key.includes("your_openai_key")) throw new AppError(503, "聊天已保存在本机。请先配置 OpenAI API Key，再重试 AI 回复。", "ai_not_configured");
       if (messages.reduce((n, m) => n + m.content.length, 0) > 80000) throw new AppError(413, "这段聊天已超出本版 AI 上下文长度，原文仍完整保留。可手写回顾后开始新聊天。", "context_too_large");
       try {
-        const client = new OpenAI({ apiKey: key, baseURL: "https://api.openai.com/v1", timeout: 60000, maxRetries: 0 });
+        const proxy = process.env.OPENAI_PROXY_URL?.trim();
+        const client = new OpenAI({
+          apiKey: key, baseURL: "https://api.openai.com/v1", timeout: 60000, maxRetries: 0,
+          ...(proxy ? { httpAgent: new HttpsProxyAgent(proxy) } : {}),
+        });
         const response = await client.chat.completions.create({
           model, store: false,
           ...(model.startsWith("gpt-5") || model.startsWith("gpt-6") ? { max_completion_tokens: 3000 } : { max_tokens: 1600 }),
@@ -39,8 +44,21 @@ export function createReflectionAI(): ReflectionAI {
         if (!value || typeof value.message !== "string" || !value.message.trim() || value.message.length > 20000 ||
             !(value.review === null || typeof value.review === "string" && value.review.trim().length > 0 && value.review.length <= 20000) || (review && !value.review)) throw new Error("Invalid model output");
         return value;
-      } catch {
-        // Never expose provider errors, prompts, or credentials in logs/API responses.
+      } catch (error) {
+        // Classify known failures without exposing provider messages or credentials.
+        const failure = error as { status?: number; code?: string; name?: string };
+        if (failure.status === 401) {
+          throw new AppError(401, "OpenAI 未接受当前 API Key。请在本机 .env.local 更换有效密钥并重启；聊天原文仍保存在本机。", "invalid_api_key");
+        }
+        if (failure.code === "insufficient_quota") {
+          throw new AppError(429, "OpenAI API 额度不足，请检查 API 平台的 Billing。聊天原文已保存，额度可用后可以重试。", "insufficient_quota");
+        }
+        if (failure.status === 429) {
+          throw new AppError(429, "OpenAI 暂时限制了请求频率，请稍后重试。聊天原文已保存。", "ai_rate_limited");
+        }
+        if (failure.name === "APIConnectionTimeoutError" || failure.name === "APIConnectionError") {
+          throw new AppError(503, "无法连接 OpenAI，请检查网络；使用代理时在 .env.local 设置 OPENAI_PROXY_URL。聊天原文已保存。", "ai_connection_failed");
+        }
         throw new AppError(503, "AI 暂时未能回复，聊天原文已保存在本机，可以重试。请检查模型配置或网络。", "ai_unavailable");
       }
     },

@@ -39,3 +39,11 @@
 尚未配置真实模型密钥，AI 回复及提示词的实际体验仍待验证。跨会话关联、行为实验和长期效果验证不在本轮工程范围内。
 
 产品构思、原话与后续方向以 [Institute 的范围确认](/Users/linuslin/Developer/linus-institute/01-Lab/Projects/Pensieve/Notes/Product-Definition/Local-Reflection-MVP-2026-09-11.md) 为来源；本文件维护实际行为、实现约束与验证状态。
+
+## 2026-09-12 · AI 连接排障
+
+新增可选 `OPENAI_PROXY_URL`，供本机后端经指定 HTTP(S) 代理连接 OpenAI；不更改操作系统代理，不自动改变其他应用的网络配置。
+
+当前机器直连超时，使用其现有本机代理后已收到 OpenAI 响应。真实合成测试返回 `401 / invalid_api_key`，因此尚未验证成功的 AI 回复，需用户更换有效密钥。密钥未显示或写入仓库，个人记忆未用作测试。
+
+界面会区分无效密钥、API 额度不足、频率限制和网络失败，错误信息不回传提供商原始报文。
