@@ -46,11 +46,14 @@ export function createReflectionAI(): ReflectionAI {
         return value;
       } catch (error) {
         // Classify known failures without exposing provider messages or credentials.
-        const failure = error as { status?: number; code?: string; name?: string };
+        const failure = (error ?? {}) as { status?: number; code?: string; type?: string; name?: string };
         if (failure.status === 401) {
           throw new AppError(401, "OpenAI 未接受当前 API Key。请在本机 .env.local 更换有效密钥并重启；聊天原文仍保存在本机。", "invalid_api_key");
         }
-        if (failure.code === "insufficient_quota") {
+        if (failure.code === "credit_balance_exhausted") {
+          throw new AppError(429, "OpenAI API 余额已用尽，请在 API 平台的 Billing 补充额度。聊天原文已保存，额度生效后可以重试。", "insufficient_quota");
+        }
+        if (failure.code === "insufficient_quota" || failure.type === "insufficient_quota") {
           throw new AppError(429, "OpenAI API 额度不足，请检查 API 平台的 Billing。聊天原文已保存，额度可用后可以重试。", "insufficient_quota");
         }
         if (failure.status === 429) {

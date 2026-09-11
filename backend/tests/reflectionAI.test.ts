@@ -36,3 +36,12 @@ it("distinguishes exhausted quota and network failure", async () => {
   mock.create.mockRejectedValueOnce({ name: "APIConnectionTimeoutError" });
   await expect(createReflectionAI().reply(messages, false)).rejects.toMatchObject({ code: "ai_connection_failed" });
 });
+it("reports exhausted credit and billing subtypes separately from request rate limits", async () => {
+  vi.stubEnv("OPENAI_API_KEY", "test-only-key");
+  mock.create.mockRejectedValueOnce({ status: 429, code: "credit_balance_exhausted", type: "insufficient_quota" });
+  await expect(createReflectionAI().reply(messages, false)).rejects.toMatchObject({ code: "insufficient_quota", message: expect.stringContaining("余额已用尽") });
+  mock.create.mockRejectedValueOnce({ status: 429, code: "project_spend_limit_exceeded", type: "insufficient_quota" });
+  await expect(createReflectionAI().reply(messages, false)).rejects.toMatchObject({ code: "insufficient_quota" });
+  mock.create.mockRejectedValueOnce({ status: 429, code: "rate_limit_exceeded" });
+  await expect(createReflectionAI().reply(messages, false)).rejects.toMatchObject({ code: "ai_rate_limited" });
+});
