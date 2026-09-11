@@ -1,3 +1,4 @@
+import { localMode } from "../../local";
 import { useEffect, useMemo, useRef } from "react";
 import { Box, Button, Group, Paper, Stack, Text, Textarea, Title } from "@mantine/core";
 
@@ -96,7 +97,7 @@ export function CaptureComposer({
                       Pensieve
                     </Text>
                     <Text c="dimmed" size="sm">
-                      Thinking...
+                      {localMode ? "正在保存到本机…" : "Thinking..."}
                     </Text>
                   </Box>
                 ) : null}
@@ -115,7 +116,7 @@ export function CaptureComposer({
               <Stack gap="sm">
                 <Textarea
                   aria-label="Message to save as a memory"
-                  placeholder="Write a memory..."
+                  placeholder={localMode ? "写下想法，或粘贴过去的文字…" : "Write a memory..."}
                   rows={3}
                   value={value}
                   onChange={(event) => onChange(event.currentTarget.value)}
@@ -133,7 +134,7 @@ export function CaptureComposer({
                   justify="space-between"
                 >
                   <Text c="dimmed" size="sm" style={{ whiteSpace: "nowrap" }}>
-                    {words} {words === 1 ? "word" : "words"}
+                    {localMode ? `${value.length} 字符 · Shift+Enter 换行` : `${words} ${words === 1 ? "word" : "words"}`}
                   </Text>
 
                   <Button
@@ -143,7 +144,7 @@ export function CaptureComposer({
                     radius="sm"
                     type="submit"
                   >
-                    Send
+                    {localMode ? "保存到本机" : "Send"}
                   </Button>
                 </Group>
               </Stack>

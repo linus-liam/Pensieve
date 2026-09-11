@@ -1,0 +1,50 @@
+import { MantineProvider } from "@mantine/core";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, expect, it, vi } from "vitest";
+import { LocalReflection } from "./LocalReflection";
+import { api } from "../../api/client";
+import type { ReflectionSession } from "../../sessionTypes";
+vi.mock("../../api/client", () => ({ api: { listSessions: vi.fn(), getSession: vi.fn(), createSession: vi.fn(), appendMessage: vi.fn(), reply: vi.fn(), confirmReview: vi.fn(), continueSession: vi.fn() } }));
+const now = "2026-09-11T15:00:00Z";
+const initial: ReflectionSession = { id: "11111111-1111-4111-8111-111111111111", created_at: now, updated_at: now, status: "active", messages: [], drafts: [], current_draft_id: null, memory_revisions: [] };
+const saved: ReflectionSession = { ...initial, messages: [{ id: "user-id", role: "user", content: "我对新计划有些犹豫", created_at: now }] };
+const review: ReflectionSession = { ...saved, status: "review", messages: [...saved.messages, { id: "assistant-id", role: "assistant", content: "这是一个暂时的理解。", created_at: now }], drafts: [{ id: "draft-id", text: "AI 的暂定回顾", created_at: now, source_message_ids: ["user-id"] }], current_draft_id: "draft-id" };
+beforeEach(() => {
+  vi.clearAllMocks(); window.history.replaceState(null, "", "#capture");
+  vi.mocked(api.listSessions).mockResolvedValue([]);
+  vi.mocked(api.createSession).mockResolvedValue(initial);
+  vi.mocked(api.appendMessage).mockResolvedValue(saved);
+  vi.mocked(api.reply).mockResolvedValue(review);
+});
+function mount() { const confirmed = vi.fn(); render(<MantineProvider><LocalReflection info={{ directory: "/tmp/memories", aiEnabled: true, provider: "OpenAI", model: "test" }} onConfirmed={confirmed}>{null}</LocalReflection></MantineProvider>); return confirmed; }
+it("requires opt-in before AI; records locally first, then lets the user edit and confirm a draft", async () => {
+  const done = mount(); const user = userEvent.setup();
+  await user.type(screen.getByLabelText("此刻想说的话"), "我对新计划有些犹豫");
+  await user.click(screen.getByRole("button", { name: "保存消息到本机" }));
+  expect(await screen.findByText("我对新计划有些犹豫")).toBeInTheDocument();
+  expect(api.reply).not.toHaveBeenCalled();
+  await user.click(screen.getByRole("checkbox"));
+  await user.click(screen.getByRole("button", { name: "生成 / 重试 AI 回复" }));
+  const editor = await screen.findByRole("textbox", { name: "回顾正文" });
+  expect(vi.mocked(api.appendMessage).mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(api.reply).mock.invocationCallOrder[0]);
+  expect(api.confirmReview).not.toHaveBeenCalled();
+  await user.clear(editor); await user.type(editor, "我自己的回顾");
+  vi.mocked(api.confirmReview).mockResolvedValue({ ...review, status: "completed", memory_revisions: [{ id: initial.id, user_id: "local", raw_input: "我自己的回顾", ai_summary: "我自己的回顾", created_at: now, updated_at: now }] });
+  await user.click(screen.getByRole("button", { name: "确认并保存为记忆" }));
+  await waitFor(() => expect(done).toHaveBeenCalledOnce());
+  expect(api.confirmReview).toHaveBeenCalledWith(initial.id, "我自己的回顾", "draft-id");
+  expect(await screen.findByText("这段回顾已由你确认，并保存在本机")).toBeInTheDocument();
+});
+it("keeps saved user text visible on AI failure and can retry without resending it", async () => {
+  mount(); const user = userEvent.setup();
+  await user.click(screen.getByRole("checkbox"));
+  vi.mocked(api.reply).mockRejectedValueOnce(new Error("AI 暂时未能回复"));
+  await user.type(screen.getByLabelText("此刻想说的话"), "我对新计划有些犹豫");
+  await user.click(screen.getByRole("button", { name: /^发送$/ }));
+  expect(await screen.findByText("AI 暂时未能回复")).toBeInTheDocument();
+  expect(screen.getByText("我对新计划有些犹豫")).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "生成 / 重试 AI 回复" }));
+  expect(await screen.findByRole("textbox", { name: "回顾正文" })).toHaveValue("AI 的暂定回顾");
+  expect(api.appendMessage).toHaveBeenCalledOnce();
+});

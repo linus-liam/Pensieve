@@ -17,6 +17,7 @@
     "compose:down": "docker compose down",
     "build:backend": "npm run build --prefix backend",
     "build:frontend": "npm run build --prefix frontend",
-    "vercel-build": "npm run build:backend && npm run build:frontend && rm -rf public && mkdir -p public && cp -r frontend/dist/* public/"
+    "vercel-build": "npm run build:backend && npm run build:frontend && rm -rf public && mkdir -p public && cp -r frontend/dist/* public/",
+    "local": "node scripts/local.mjs"
   }
 }

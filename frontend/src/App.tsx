@@ -1,3 +1,6 @@
+import { LocalReflection } from "./components/reflection/LocalReflection";
+import type { LocalInfo } from "./sessionTypes";
+import { localMode } from "./local";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
@@ -10,6 +13,7 @@ import {
   Text,
   Stack,
   Title,
+  TextInput,
 } from "@mantine/core";
 import { api } from "./api/client";
 import { AuthGate } from "./auth/AuthGate";
@@ -36,7 +40,7 @@ const initialCaptureMessages: CaptureChatMessage[] = [
   {
     id: "capture-greeting",
     role: "assistant",
-    content: "I'm here. What feels worth remembering right now?",
+    content: localMode ? "今天有什么值得留下？可以记录想法，也可以粘贴过去的文字。原文会保存在本机，不会发送给 AI。" : "I'm here. What feels worth remembering right now?",
   },
 ];
 
@@ -86,13 +90,14 @@ function inferTags(content: string) {
 function toMemory(entry: MemoryEntry): Memory {
   return {
     id: entry.id,
+    sourceSessionId: entry.source_session_id,
     day: getDayLabel(entry.created_at),
     time: formatTime(entry.created_at),
     source: "Text",
     sourceType: "text",
     summary: entry.ai_summary,
     rawInput: entry.raw_input,
-    tags: inferTags(entry.raw_input),
+    tags: localMode ? [] : inferTags(entry.raw_input),
   };
 }
 
@@ -130,6 +135,12 @@ function AuthenticatedApp() {
   const [captureMessages, setCaptureMessages] = useState<CaptureChatMessage[]>(() => [
     ...initialCaptureMessages,
   ]);
+  const [archived, setArchived] = useState(false);
+  const [search, setSearch] = useState("");
+  const [localInfo, setLocalInfo] = useState<LocalInfo | null>(null);
+  useEffect(() => {
+    if (localMode) void api.localInfo().then(info => setLocalInfo(info)).catch(() => {});
+  }, []);
   const [entries, setEntries] = useState<MemoryEntry[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(initialRoute.selectedId);
   const [detailDraft, setDetailDraft] = useState("");
@@ -144,24 +155,24 @@ function AuthenticatedApp() {
     setError(null);
 
     try {
-      const nextEntries = await api.listMemoryEntries();
+      const nextEntries = await api.listMemoryEntries(archived);
       setEntries(nextEntries);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Could not load memories");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [archived]);
 
   useEffect(() => {
     void loadEntries();
   }, [loadEntries]);
 
-  const memories = useMemo(() => entries.map(toMemory), [entries]);
+  const memories = useMemo(() => entries.filter(entry => !localMode || `${entry.raw_input} ${entry.ai_summary}`.toLowerCase().includes(search.toLowerCase())).map(toMemory), [entries, search]);
   const selectedEntry = entries.find((entry) => entry.id === selectedId) ?? null;
   const selectedMemory = selectedEntry ? toMemory(selectedEntry) : null;
   const canSave = draft.trim().length > 0;
-  const canUpdate = detailDraft.trim().length > 0 && detailDraft.trim() !== selectedEntry?.raw_input;
+  const canUpdate = detailDraft.trim().length > 0 && (localMode ? detailDraft : detailDraft.trim()) !== selectedEntry?.raw_input;
   const activeNavPage = getActiveNavPage(page);
 
   const applyRoute = useCallback((route: RouteState) => {
@@ -226,8 +237,8 @@ function AuthenticatedApp() {
   );
 
   const saveMemory = useCallback(async () => {
-    const rawInput = draft.trim();
-    if (!rawInput || saving) return;
+    const rawInput = localMode ? draft : draft.trim();
+    if (!rawInput.trim() || saving) return;
 
     const userMessageId = createChatMessageId("user");
     setSaving(true);
@@ -240,7 +251,8 @@ function AuthenticatedApp() {
 
     try {
       const entry = await api.createMemoryEntry(rawInput);
-      setEntries((current) => [entry, ...current]);
+      if (archived) setArchived(false);
+      setEntries((current) => archived ? [entry] : [entry, ...current]);
       setCaptureMessages((current) => [
         ...current.map((message) =>
           message.id === userMessageId ? { ...message, status: undefined } : message
@@ -268,7 +280,7 @@ function AuthenticatedApp() {
     } finally {
       setSaving(false);
     }
-  }, [draft, saving]);
+  }, [draft, saving, archived]);
 
   const openMemory = useCallback((memory: Memory) => {
     setSelectedId(memory.id);
@@ -284,7 +296,7 @@ function AuthenticatedApp() {
     setError(null);
 
     try {
-      const updated = await api.updateMemoryEntry(selectedEntry.id, detailDraft.trim());
+      const updated = await api.updateMemoryEntry(selectedEntry.id, localMode ? detailDraft : detailDraft.trim());
       setEntries((current) =>
         current.map((entry) => (entry.id === updated.id ? updated : entry))
       );
@@ -335,9 +347,9 @@ function AuthenticatedApp() {
             <Stack gap="md">
               <Group className="account-bar" gap="sm" justify="space-between" wrap="nowrap">
                 <Text c="dimmed" lineClamp={1} size="sm">
-                  {user?.email ?? "Google account"}
+                  {localMode ? "聊天与历史保存在本机" : user?.email ?? "Google account"}
                 </Text>
-                <Button
+                {!localMode && <Button
                   loading={signingOut}
                   radius="sm"
                   size="xs"
@@ -345,8 +357,13 @@ function AuthenticatedApp() {
                   onClick={signOut}
                 >
                   Sign out
-                </Button>
+                </Button>}
               </Group>
+
+              {localMode && <Stack gap={4}>
+                <Text size="xs" c="dimmed" style={{ overflowWrap: "anywhere" }}>存储目录：{localInfo?.directory || "正在连接本地存储…"}</Text>
+                <Button size="xs" variant="subtle" w="fit-content" onClick={() => { void api.exportMarkdown().catch(e => setError(e.message)); }}>导出全部记忆与历史（Markdown）</Button>
+              </Stack>}
 
               {page === "capture" ? (
                 <Stack gap="lg">
@@ -355,14 +372,16 @@ function AuthenticatedApp() {
                       {error}
                     </Alert>
                   ) : null}
-                  <CaptureComposer
+                  {localMode ? <LocalReflection info={localInfo} onConfirmed={() => void loadEntries()}>
+                    <CaptureComposer canSave={canSave} messages={captureMessages} saving={saving} value={draft} onChange={setDraft} onSave={saveMemory} />
+                  </LocalReflection> : <CaptureComposer
                     canSave={canSave}
                     messages={captureMessages}
                     saving={saving}
                     value={draft}
                     onChange={setDraft}
                     onSave={saveMemory}
-                  />
+                  />}
                 </Stack>
               ) : null}
 
@@ -383,6 +402,10 @@ function AuthenticatedApp() {
                     </Alert>
                   ) : null}
 
+                  {localMode && <Group>
+                    <TextInput aria-label="搜索记忆" placeholder="搜索原文与摘录" value={search} onChange={e => setSearch(e.currentTarget.value)} style={{ flex: 1 }} />
+                    <Button variant="default" onClick={() => setArchived(value => !value)}>{archived ? "返回记忆" : "查看归档"}</Button>
+                  </Group>}
                   {loading ? (
                     <Group gap="xs">
                       <Loader size="sm" />
@@ -432,6 +455,11 @@ function AuthenticatedApp() {
                   <Title order={2} size="h2">
                     Memory detail
                   </Title>
+                  {localMode && archived && selectedEntry && <Button onClick={() => { void api.restore(selectedEntry.id).then(() => { setArchived(false); navigate("memories"); }).catch(e => setError(e.message)); }}>恢复到记忆列表</Button>}
+                  {selectedEntry?.source_session_id && <Button variant="light" onClick={() => {
+                    window.location.hash = `capture?session=${selectedEntry.source_session_id}`;
+                    setPage("capture"); setSelectedId(null);
+                  }}>查看这条回顾的完整聊天</Button>}
                   <MemoryDetail
                     canUpdate={canUpdate}
                     error={error}

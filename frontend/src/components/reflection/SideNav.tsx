@@ -1,3 +1,4 @@
+import { localMode } from "../../local";
 import { Button, NavLink, Stack, Text, Title } from "@mantine/core";
 import { BookOpen, PenLine } from "lucide-react";
 
@@ -54,12 +55,12 @@ export function SideNav({
 
       <Stack gap={6}>
         <Text c="dimmed" size="xs">
-          Signed in
+          {localMode ? "本地个人空间" : "Signed in"}
         </Text>
         <Text lineClamp={1} size="sm">
-          {userEmail ?? "Google account"}
+          {localMode ? "内容保存在这台电脑" : userEmail ?? "Google account"}
         </Text>
-        <Button
+        {!localMode && <Button
           fullWidth
           loading={signingOut}
           radius="sm"
@@ -68,7 +69,7 @@ export function SideNav({
           onClick={onSignOut}
         >
           Sign out
-        </Button>
+        </Button>}
       </Stack>
     </Stack>
   );
