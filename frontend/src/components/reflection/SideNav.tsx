@@ -64,7 +64,7 @@ export function SideNav({
           {localMode ? "本地个人空间" : "Signed in"}
         </Text>
         <Text lineClamp={1} size="sm">
-          {localMode ? "内容保存在这台电脑" : userEmail ?? "Google account"}
+          {localMode ? "内容保存在当前设备" : userEmail ?? "Google account"}
         </Text>
         {!localMode && <Button
           fullWidth

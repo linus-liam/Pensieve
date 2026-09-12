@@ -8,4 +8,4 @@ export interface ReflectionSession {
 }
 export interface SessionListItem { id: string; title: string; updated_at: string; status: ReflectionSession["status"]; message_count: number }
 export interface BackupStatus { directory: string; lastBackupAt: string | null; count: number; error: string | null }
-export interface LocalInfo { directory: string; aiEnabled: boolean; model: string; provider: string; backup?: BackupStatus | null }
+export interface LocalInfo { directory: string; aiEnabled: boolean; model: string; provider: string; backup?: BackupStatus | null; authenticated?: boolean }

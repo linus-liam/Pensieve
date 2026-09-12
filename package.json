@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "overrides": { "qs": "6.16.0" },
   "workspaces": [
     "frontend",
     "backend"
@@ -22,6 +23,8 @@
     "start:local": "node scripts/start-local.mjs",
     "restore:local": "tsx backend/src/restoreLocal.ts",
     "stop:local": "node scripts/stop-local.mjs",
-    "eval:reflection": "npm run eval:reflection --workspace backend --"
+    "eval:reflection": "npm run eval:reflection --workspace backend --",
+    "build:mobile": "npm run typecheck --workspaces && node scripts/build-mobile.mjs",
+    "dev:mobile-api": "tsx backend/src/mobileIndex.ts"
   }
 }

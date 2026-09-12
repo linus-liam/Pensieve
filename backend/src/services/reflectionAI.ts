@@ -2,11 +2,12 @@ import OpenAI from "openai";
 import { HttpsProxyAgent } from "https-proxy-agent";
 import { AppError } from "../errors.js";
 import type { SessionMessage } from "./localSessionStore.js";
+import { reflectionTimeContext } from "./reflectionTime.js";
 
 export interface ReflectionReply { message: string; review: string | null }
 export interface ReflectionAI {
   configured: boolean; model: string;
-  reply: (messages: SessionMessage[], review: boolean) => Promise<ReflectionReply>;
+  reply: (messages: SessionMessage[], review: boolean, context?: { timeZone?: string }) => Promise<ReflectionReply>;
 }
 export const reflectionPrompt = `你是 Pensieve，一位帮助用户理解经历、情绪和困惑的反思伙伴。用用户的语言自然交流。
 用户的感受是真实的，解释和推断则可以被共同检视。先理解，再温和探索；有依据时表达不同看法，不附和，不预设用户有认知偏差，不替用户下结论。
@@ -25,7 +26,7 @@ export function createReflectionAI(): ReflectionAI {
   const model = process.env.AI_CHAT_MODEL?.trim() || "gpt-4o-mini";
   return {
     configured: Boolean(key && !key.includes("your_openai_key")), model,
-    async reply(messages, review) {
+    async reply(messages, review, context) {
       if (!key || key.includes("your_openai_key")) throw new AppError(503, "聊天已保存在本机。请先配置 OpenAI API Key，再重试 AI 回复。", "ai_not_configured");
       if (messages.reduce((n, m) => n + m.content.length, 0) > 80000) throw new AppError(413, "这段聊天已超出本版 AI 上下文长度，原文仍完整保留。可手写回顾后开始新聊天。", "context_too_large");
       try {
@@ -37,7 +38,7 @@ export function createReflectionAI(): ReflectionAI {
         const response = await client.chat.completions.create({
           model, store: false,
           ...(model.startsWith("gpt-5") || model.startsWith("gpt-6") ? { max_completion_tokens: 3000 } : { max_tokens: 1600 }),
-          messages: [{ role: "system", content: reflectionPrompt + (review ? "\n现在请结束提问，为已有对话生成待确认回顾，review 不可为空。" : "") }, ...messages.map(m => ({ role: m.role, content: m.content }))],
+          messages: [{ role: "system", content: reflectionPrompt + reflectionTimeContext(messages, context?.timeZone) + (review ? "\n现在请结束提问，为已有对话生成待确认回顾，review 不可为空。" : "") }, ...messages.map(m => ({ role: m.role, content: m.content }))],
           response_format: { type: "json_schema", json_schema: { name: "reflection_reply", strict: true, schema: {
             type: "object", properties: { message: { type: "string" }, review: { type: ["string", "null"] } }, required: ["message", "review"], additionalProperties: false,
           } } },

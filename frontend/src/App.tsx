@@ -379,7 +379,7 @@ function AuthenticatedApp() {
                       {error}
                     </Alert>
                   ) : null}
-                  {localMode ? <LocalReflection info={localInfo} onConfirmed={() => void loadEntries()} historyOpen={historyOpen} onHistoryClose={() => setHistoryOpen(false)}>
+                  {localMode ? <LocalReflection info={localInfo} onConfirmed={() => void loadEntries()} historyOpen={historyOpen} onHistoryClose={() => setHistoryOpen(false)} onOpenSettings={() => setSettingsOpen(true)}>
                     <CaptureComposer canSave={canSave} messages={captureMessages} saving={saving} value={draft} onChange={setDraft} onSave={saveMemory} />
                   </LocalReflection> : <CaptureComposer
                     canSave={canSave}

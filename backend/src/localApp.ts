@@ -75,7 +75,7 @@ export function createLocalApp(directory: string, token: string, ai: ReflectionA
       if (last.role === "assistant" && req.body?.review !== true) return;
       const previousDraft = session.drafts.at(-1);
       const sinceReview = session.messages.filter(m => m.role === "user" && !previousDraft?.source_message_ids.includes(m.id)).length;
-      const reply = await ai.reply(session.messages.map(message => ({ ...message })), req.body?.review === true || sinceReview >= 12);
+      const reply = await ai.reply(session.messages.map(message => ({ ...message })), req.body?.review === true || sinceReview >= 12, { timeZone: typeof req.body?.timeZone === "string" ? req.body.timeZone : undefined });
       const sourceIds = session.messages.map(m => m.id);
       const now = new Date().toISOString();
       session.messages.push({ id: responseId, role: "assistant", content: reply.message, created_at: now });

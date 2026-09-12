@@ -3,11 +3,12 @@ import { Alert, Button, Drawer, Group, Modal, Paper, Stack, Text, Textarea, Text
 import { api } from "../../api/client";
 import type { LocalInfo, ReflectionSession, SessionListItem } from "../../sessionTypes";
 import { useLocalAIConsent } from "./useLocalAIConsent";
+import { mobileMode } from "../../local";
 
 function idFromHash() { return new URLSearchParams(window.location.hash.split("?")[1] ?? "").get("session"); }
 function label(status: ReflectionSession["status"]) { return { active: "可以接着聊", review: "回顾待确认", completed: "已存为记忆" }[status]; }
 
-export function LocalReflection({ info, onConfirmed, children, historyOpen = false, onHistoryClose = () => {} }: { info: LocalInfo | null; onConfirmed: () => void; children: ReactNode; historyOpen?: boolean; onHistoryClose?: () => void }) {
+export function LocalReflection({ info, onConfirmed, children, historyOpen = false, onHistoryClose = () => {}, onOpenSettings = () => {} }: { info: LocalInfo | null; onConfirmed: () => void; children: ReactNode; historyOpen?: boolean; onHistoryClose?: () => void; onOpenSettings?: () => void }) {
   const [session, setSession] = useState<ReflectionSession | null>(null);
   const [items, setItems] = useState<SessionListItem[]>([]);
   const [input, setInput] = useState("");
@@ -156,7 +157,7 @@ export function LocalReflection({ info, onConfirmed, children, historyOpen = fal
     </Drawer>
     <Modal opened={consentOpen} onClose={() => setConsentOpen(false)} title="让 AI 陪你聊聊" centered closeButtonProps={{ "aria-label": "关闭 AI 说明" }}>
       <Stack gap="md">
-        <Text>开启后，当前会话的完整消息会发送给 OpenAI，生成回复与回顾。其他历史聊天不会自动发送。</Text>
+        <Text>{mobileMode ? "开启后，当前会话的完整消息会经 Pensieve 的 Vercel 服务发送给 OpenAI，生成回复与回顾。其他历史聊天不会自动发送。" : "开启后，当前会话的完整消息会发送给 OpenAI，生成回复与回顾。其他历史聊天不会自动发送。"}</Text>
         <Text size="sm" c="dimmed">这个浏览器会记住你的选择，后续聊天也会使用 AI；可随时在设置中关闭。内容保存在本机，云端请求仍受 OpenAI 数据保留政策约束。</Text>
         <Text component="a" href="https://developers.openai.com/api/docs/guides/your-data" target="_blank" rel="noreferrer" size="sm">查看数据处理说明</Text>
         <Button onClick={() => { setConsent(true); setConsentOpen(false); void send(true); }}>开启 AI 并发送</Button>
@@ -165,6 +166,7 @@ export function LocalReflection({ info, onConfirmed, children, historyOpen = fal
     </Modal>
     {session ? <Group justify="space-between"><Title order={2} size="h3">聊一会儿</Title><Button variant="subtle" disabled={busy || Boolean(input.trim())} onClick={() => void selectSession(null)}>新聊天</Button></Group> :
       <Stack gap="sm" className="reflection-greeting"><Title order={2}>今天，想聊些什么？</Title><Text c="dimmed">从一句话开始就好。</Text></Stack>}
+    {mobileMode && info && !info.authenticated && <Paper p="md" withBorder><Group justify="space-between"><Text size="sm">首次使用，先输入试用口令连接 AI。也可以先保存原文。</Text><Button variant="light" onClick={onOpenSettings}>连接 AI</Button></Group></Paper>}
     {error && <Alert color="red" title="这一步没有完成" role="alert">{error}</Alert>}
       <Stack gap="lg">
         {Boolean(session?.messages.length) &&
@@ -172,7 +174,7 @@ export function LocalReflection({ info, onConfirmed, children, historyOpen = fal
           <summary hidden={!reviewing && !completed}>回看这段聊天 · {session?.messages.length ?? 0} 条消息</summary>
         <div role="log" aria-label="Reflection conversation" aria-live="polite" className="reflection-messages">
           {session?.messages.map(message => <div key={message.id} className={`reflection-message reflection-message--${message.role}`}>
-            <Group justify="space-between" mb={8}><Text size="xs" c="dimmed">{message.role === "user" ? "你" : "Pensieve"}</Text><Text size="xs" c="dimmed">{new Date(message.created_at).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}</Text></Group>
+            <Group justify="space-between" mb={8}><Text size="xs" c="dimmed">{message.role === "user" ? "你" : "Pensieve"}</Text><Text size="xs" c="dimmed">{new Date(message.created_at).toLocaleString("zh-CN", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</Text></Group>
             <Text lh={1.85} style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{message.content}</Text>
           </div>)}
           <div ref={messagesEnd} />
@@ -200,8 +202,8 @@ export function LocalReflection({ info, onConfirmed, children, historyOpen = fal
         </section> : <>
           <Paper withBorder p="md" radius="lg" className="reflection-composer">
             <Textarea ref={composer} aria-label="此刻想说的话" placeholder="此刻想说的话…" value={input} variant="unstyled" autosize minRows={3} maxRows={8} maxLength={20000} disabled={busy}
-              onChange={e => setInput(e.currentTarget.value)} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); requestSend(); } }} />
-            <Group justify="space-between" mt="sm"><Text size="xs" c="dimmed">{session?.messages.length && !input ? "已保存到本机" : "Enter 发送 · Shift+Enter 换行"}</Text><Button loading={busy} disabled={!input.trim() || busy || !info} onClick={requestSend}>{info?.aiEnabled && (!hasConsentChoice || consent) ? "发送" : "保存"}</Button></Group>
+              onChange={e => setInput(e.currentTarget.value)} onKeyDown={e => { if (!mobileMode && e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); requestSend(); } }} />
+            <Group justify="space-between" mt="sm"><Text size="xs" c="dimmed">{session?.messages.length && !input ? "已保存到本机" : mobileMode ? "原文先保存到设备" : "Enter 发送 · Shift+Enter 换行"}</Text><Button loading={busy} disabled={!input.trim() || busy || !info} onClick={requestSend}>{info?.aiEnabled && (!hasConsentChoice || consent) ? "发送" : "保存"}</Button></Group>
           </Paper>
           {!canUseAI && <Text size="xs" c="dimmed">{info?.aiEnabled ? hasConsentChoice ? "当前只在本机记录。可在设置中开启 AI。" : "首次使用 AI 时，会先说明内容的去向。" : "尚未连接 AI，可以先写下来。连接方式在设置里。"}</Text>}
           {session?.messages.length ? <Group>

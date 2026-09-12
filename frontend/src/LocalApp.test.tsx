@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { App } from "./App";
 import { AuthProvider } from "./auth/AuthProvider";
-vi.mock("./local", () => ({ localMode: true, localToken: "local-test-token" }));
+vi.mock("./local", () => ({ localMode: true, mobileMode: false, localToken: "local-test-token" }));
 const record = { id: "11111111-1111-4111-8111-111111111111", user_id: "local", raw_input: "旧日的理解", ai_summary: "旧日的理解", created_at: "2026-09-11T12:00:00Z", updated_at: "2026-09-11T12:00:00Z" };
 function json(data: unknown) { return new Response(JSON.stringify(data), { status: 200 }); }
 beforeEach(() => { window.localStorage.clear(); window.history.pushState(null, "", "/"); });
