@@ -213,6 +213,6 @@ export function LocalReflection({ info, onConfirmed, children, historyOpen = fal
           </Group> : null}
         </>}
       </Stack>
-    {!session && <details className="reflection-import"><summary>留存已有文字</summary><Text size="sm" c="dimmed" my="sm">粘贴旧笔记或聊天原文，按独立文字存档保存。</Text>{children}</details>}
+    {!session && <details className="reflection-import"><summary>导入已有的讨论与文字</summary><Text size="sm" c="dimmed" my="sm">选择 ZIP、Markdown、TXT 或粘贴原文，完整留在原材料中。</Text>{children}</details>}
   </Stack>;
 }

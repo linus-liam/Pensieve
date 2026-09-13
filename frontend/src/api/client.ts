@@ -3,6 +3,7 @@ import { localMode, localToken, mobileMode } from "../local";
 import type { CapturedMemoryEntry, MemoryEntry } from "../types";
 import { getSupabaseAccessToken } from "../auth/supabaseClient";
 import { mobileRequest, exportMobileMarkdown } from "../mobile/api";
+import type { MaterialBackup, MaterialInput, MaterialSummary, RawMaterial } from "../../../backend/src/imports/materials";
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "/api";
 
@@ -32,6 +33,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  listMaterials: () => request<MaterialSummary[]>("/materials"),
+  getMaterial: (id: string) => request<RawMaterial>(`/materials/${id}`),
+  importMaterial: (input: MaterialInput) => request<{ material: MaterialSummary; duplicate: boolean }>("/materials", { method: "POST", body: JSON.stringify(input) }),
+  restoreMaterial: (backup: MaterialBackup) => request<{ material: MaterialSummary; duplicate: boolean }>("/materials/restore", { method: "POST", body: JSON.stringify(backup) }),
   listMemoryEntries: (archived = false) => request<MemoryEntry[]>(`/memory-entries?limit=100${localMode ? `&archived=${archived}` : ""}`),
 
   listSessions: () => request<SessionListItem[]>("/sessions"),

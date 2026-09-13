@@ -1,8 +1,8 @@
 import { localMode } from "../../local";
 import { Button, NavLink, Stack, Text, Title } from "@mantine/core";
-import { BookOpen, History, PenLine, Settings } from "lucide-react";
+import { Archive, BookOpen, History, PenLine, Settings } from "lucide-react";
 
-type Page = "capture" | "memories";
+type Page = "capture" | "memories" | "materials";
 
 interface SideNavProps {
   page: Page;
@@ -46,6 +46,7 @@ export function SideNav({
             onClick={() => onNavigate("capture")}
           />
           {localMode && <NavLink component="button" label="过去的聊天" leftSection={<History size={16} />} onClick={onHistory} />}
+          {localMode && <NavLink component="button" label="原材料" active={page === "materials"} aria-current={page === "materials" ? "page" : undefined} leftSection={<Archive size={16} />} onClick={() => onNavigate("materials")} />}
           <NavLink
             active={page === "memories"}
             aria-current={page === "memories" ? "page" : undefined}

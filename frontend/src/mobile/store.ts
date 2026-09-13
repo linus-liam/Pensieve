@@ -1,19 +1,21 @@
 import type { ReflectionSession } from "../sessionTypes";
 import type { MemoryRevision } from "../api/client";
+import { materialBackup, readMaterialBackup, type MaterialBackup, type RawMaterial } from "../../../backend/src/imports/materials";
 
 export interface StoredEntry { id: string; revisions: MemoryRevision[] }
-export interface PhoneBackup { format: "pensieve-phone-v1"; exported_at: string; sessions: ReflectionSession[]; entries: StoredEntry[] }
+export interface PhoneBackup { format: "pensieve-phone-v1" | "pensieve-phone-v2"; exported_at: string; sessions: ReflectionSession[]; entries: StoredEntry[]; materials?: MaterialBackup[] }
+export const MAX_PHONE_BACKUP_BYTES = 200 * 1024 * 1024;
 const databaseName = "pensieve-phone-v1";
-type Collection = "sessions" | "entries";
+type Collection = "sessions" | "entries" | "materials";
 function database(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(databaseName, 1);
+    const request = indexedDB.open(databaseName, 2);
     request.onupgradeneeded = () => {
-      request.result.createObjectStore("sessions", { keyPath: "id" });
-      request.result.createObjectStore("entries", { keyPath: "id" });
+      for (const name of ["sessions", "entries", "materials"]) if (!request.result.objectStoreNames.contains(name)) request.result.createObjectStore(name, { keyPath: "id" });
     };
     request.onerror = () => reject(new Error("未能打开设备存储。请使用普通浏览模式，并检查可用空间。"));
-    request.onsuccess = () => resolve(request.result);
+    request.onblocked = () => reject(new Error("请关闭其他 Pensieve 页面，再重新打开以完成存储升级。"));
+    request.onsuccess = () => { request.result.onversionchange = () => request.result.close(); resolve(request.result); };
   });
 }
 export async function all<T>(collection: Collection): Promise<T[]> {
@@ -51,13 +53,17 @@ export async function change<T>(collection: Collection, id: string, mutate: (val
     tx.onabort = () => { db.close(); reject(error ?? new Error("保存未完成，请检查设备空间；这次输入还在页面中。")); };
   });
 }
-export async function snapshot(): Promise<PhoneBackup> {
+export async function snapshot(includeMaterials = true): Promise<PhoneBackup> {
   const db = await database();
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(["sessions", "entries"], "readonly");
+    const tx = db.transaction(includeMaterials ? ["sessions", "entries", "materials"] : ["sessions", "entries"], "readonly");
     const sessions = tx.objectStore("sessions").getAll();
     const entries = tx.objectStore("entries").getAll();
-    tx.oncomplete = () => { db.close(); resolve({ format: "pensieve-phone-v1", exported_at: new Date().toISOString(), sessions: sessions.result, entries: entries.result }); };
+    const materials = includeMaterials ? tx.objectStore("materials").getAll() : null;
+    tx.oncomplete = () => {
+      db.close();
+      void Promise.all((materials?.result ?? []).map((record: RawMaterial) => materialBackup(record))).then(backups => resolve({ format: "pensieve-phone-v2", exported_at: new Date().toISOString(), sessions: sessions.result, entries: entries.result, materials: backups }), reject);
+    };
     tx.onabort = () => { db.close(); reject(new Error("备份读取未完成")); };
   });
 }
@@ -69,7 +75,8 @@ export function validateBackup(value: unknown): PhoneBackup {
   const fail = () => { throw new Error("这不是有效的 Pensieve 手机备份，原有内容未修改。"); };
   if (!value || typeof value !== "object") return fail();
   const b = value as PhoneBackup;
-  if (b.format !== "pensieve-phone-v1" || !date(b.exported_at) || !Array.isArray(b.sessions) || !Array.isArray(b.entries) || b.sessions.length + b.entries.length > 10000) return fail();
+  if (!["pensieve-phone-v1", "pensieve-phone-v2"].includes(b.format) || !date(b.exported_at) || !Array.isArray(b.sessions) || !Array.isArray(b.entries) || b.sessions.length + b.entries.length > 10000) return fail();
+  if (b.format === "pensieve-phone-v2" ? !Array.isArray(b.materials) || b.materials.length > 10000 : b.materials !== undefined) return fail();
   const revision = (r: MemoryRevision, id: string) => r && r.id === id && r.user_id === "local" && text(r.raw_input) && text(r.ai_summary) && date(r.created_at) && date(r.updated_at) && Number.isInteger(r.revision) && r.revision > 0 && ["created", "edited", "archived", "restored"].includes(r.action) && typeof r.archived === "boolean";
   const ids = new Set<string>();
   for (const s of b.sessions) {
@@ -98,11 +105,21 @@ export function validateBackup(value: unknown): PhoneBackup {
 }
 export async function restoreBackup(value: unknown) {
   const backup = validateBackup(value);
+  // Verify every original before opening the write transaction. A bad final record
+  // must not leave earlier records partially restored.
+  const materials: RawMaterial[] = [];
+  const materialIds = new Set<string>();
+  for (const envelope of backup.materials ?? []) {
+    const record = await readMaterialBackup(envelope);
+    if (materialIds.has(record.id)) throw new Error("备份中有重复原件，未恢复。");
+    materialIds.add(record.id); materials.push(record);
+  }
   const db = await database();
   return new Promise<void>((resolve, reject) => {
-    const tx = db.transaction(["sessions", "entries"], "readwrite", { durability: "strict" });
+    const tx = db.transaction(["sessions", "entries", "materials"], "readwrite", { durability: "strict" });
     let conflict = false;
-    for (const collection of ["sessions", "entries"] as const) for (const record of backup[collection]) {
+    const records = { sessions: backup.sessions, entries: backup.entries, materials };
+    for (const collection of ["sessions", "entries", "materials"] as const) for (const record of records[collection]) {
       const store = tx.objectStore(collection);
       const read = store.get(record.id);
       read.onsuccess = () => {

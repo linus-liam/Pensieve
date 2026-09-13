@@ -3,15 +3,21 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { App } from "./App";
 import { AuthProvider } from "./auth/AuthProvider";
+import { webcrypto } from "node:crypto";
+import { makeMaterial, summary, type RawMaterial } from "../../backend/src/imports/materials";
 vi.mock("./local", () => ({ localMode: true, mobileMode: false, localToken: "local-test-token" }));
 const record = { id: "11111111-1111-4111-8111-111111111111", user_id: "local", raw_input: "旧日的理解", ai_summary: "旧日的理解", created_at: "2026-09-11T12:00:00Z", updated_at: "2026-09-11T12:00:00Z" };
 function json(data: unknown) { return new Response(JSON.stringify(data), { status: 200 }); }
 beforeEach(() => { window.localStorage.clear(); window.history.pushState(null, "", "/"); });
 afterEach(() => { vi.unstubAllGlobals(); });
 it("opens without cloud auth and saves exact text using the local credential", async () => {
+  vi.stubGlobal("crypto", webcrypto);
+  let material: RawMaterial | null = null;
   const fetch = vi.fn(async (url: string, init?: RequestInit) => {
     if (url.endsWith("/local-info")) return json({ directory: "/local/memories", aiEnabled: false });
-    if (init?.method === "POST") return json({ ...record, raw_input: JSON.parse(init.body as string).rawInput, acknowledgement: "本机已保存" });
+    if (url.endsWith("/materials") && init?.method === "POST") { material = await makeMaterial(JSON.parse(init.body as string)); return json({ material: summary(material), duplicate: false }); }
+    if (url.endsWith("/materials")) return json(material ? [summary(material)] : []);
+    if (url.includes("/materials/")) return json(material);
     return json([]);
   });
   vi.stubGlobal("fetch", fetch);
@@ -20,13 +26,15 @@ it("opens without cloud auth and saves exact text using the local credential", a
   expect(screen.queryByText(/存储目录/)).not.toBeInTheDocument();
   expect(screen.queryByText("Continue with Google")).not.toBeInTheDocument();
   const user = userEvent.setup();
-  await user.click(screen.getByText("留存已有文字"));
-  await user.click(screen.getByRole("textbox", { name: "Message to save as a memory" }));
+  await user.click(within(screen.getByRole("navigation", { name: "Main navigation" })).getByRole("button", { name: "原材料" }));
+  expect(window.location.hash).toBe("#materials");
+  await user.click(screen.getByRole("textbox", { name: "粘贴原文" }));
   await user.paste("  原文\n第二行  ");
-  await user.click(screen.getByRole("button", { name: "Send memory" }));
-  expect(await screen.findByText("本机已保存")).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "预览这段文字" }));
+  await user.click(await screen.findByRole("button", { name: "保存原件" }));
+  expect(await screen.findByText("原件已校验")).toBeInTheDocument();
   const submitted = fetch.mock.calls.find(([, init]) => init?.method === "POST")!;
-  expect(JSON.parse(submitted[1]!.body as string).rawInput).toBe("  原文\n第二行  ");
+  expect(atob(JSON.parse(submitted[1]!.body as string).base64)).toBe(new TextEncoder().encode("  原文\n第二行  ").reduce((s, b) => s + String.fromCharCode(b), ""));
   expect(submitted[1]!.headers).toMatchObject({ "X-Pensieve-Local-Token": "local-test-token" });
   expect(submitted[1]!.headers).not.toHaveProperty("Authorization");
 });

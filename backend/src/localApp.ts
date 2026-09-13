@@ -10,12 +10,15 @@ import { errorHandler } from "./middleware/errorHandler.js";
 import { requireUuid } from "./utils/validation.js";
 import { AppError } from "./errors.js";
 import type { LocalBackups } from "./services/localBackups.js";
+import { LocalMaterialStore } from "./services/localMaterialStore.js";
+import { ImportError } from "./imports/materials.js";
 
 export function createLocalApp(directory: string, token: string, ai: ReflectionAI = createReflectionAI(), backups?: LocalBackups) {
   if (token.length < 32) throw new Error("Local access token must be at least 32 characters");
   const app = express();
   const store = new LocalMemoryStore(directory);
   const sessions = new LocalSessionStore(join(directory, "sessions"));
+  const materials = new LocalMaterialStore(join(directory, "materials"));
   app.use(helmet());
   app.use((req, res, next) => {
     const supplied = Buffer.from(req.get("X-Pensieve-Local-Token") ?? "");
@@ -27,6 +30,7 @@ export function createLocalApp(directory: string, token: string, ai: ReflectionA
     res.set("Cache-Control", "no-store");
     next();
   });
+  app.use("/api/materials", express.json({ limit: "36mb" }));
   app.use(express.json({ limit: "2mb" }));
   if (backups) app.use((req, res, next) => {
     res.on("finish", () => {
@@ -44,6 +48,16 @@ export function createLocalApp(directory: string, token: string, ai: ReflectionA
     catch (error) { if (error instanceof AppError && error.status === 404) return null; throw error; }
   }
   app.get("/api/local-info", asyncHandler(async (_req, res) => res.json({ mode: "local", directory, aiEnabled: ai.configured, model: ai.model, provider: "OpenAI", backup: backups ? await backups.status() : null })));
+  app.get("/api/materials", asyncHandler(async (_req, res) => res.json(await materials.list())));
+  app.get("/api/materials/:id", asyncHandler(async (req, res) => res.json(await materials.get(req.params.id))));
+  app.post("/api/materials", asyncHandler(async (req, res) => {
+    const result = await materials.import(req.body);
+    res.status(result.duplicate ? 200 : 201).json(result);
+  }));
+  app.post("/api/materials/restore", asyncHandler(async (req, res) => {
+    const result = await materials.restore(req.body);
+    res.status(result.duplicate ? 200 : 201).json(result);
+  }));
   app.post("/api/backups", asyncHandler(async (_req, res) => {
     if (!backups) throw new AppError(503, "请从本机启动器开启自动备份", "backups_unavailable");
     try { res.json(await backups.run()); }
@@ -147,6 +161,12 @@ export function createLocalApp(directory: string, token: string, ai: ReflectionA
     const id = requireUuid(req.params.id, "id");
     res.json(await sessionOrNull(id) ? (await sessions.changeMemory(id, "restored")).memory_revisions.at(-1) : await store.change(id, "restored"));
   }));
+  app.use(((error, _req, res, next) => {
+    if (error instanceof ImportError) { res.status(400).json({ error: error.message, code: "invalid_import" }); return; }
+    if (error?.type === "entity.too.large") { res.status(413).json({ error: "文件或文字超过本次请求大小限制，请拆分导入。", code: "input_too_large" }); return; }
+    if (error?.type === "entity.parse.failed") { res.status(400).json({ error: "请求格式无效，未保存。", code: "invalid_json" }); return; }
+    next(error);
+  }) as express.ErrorRequestHandler);
   app.use(errorHandler);
   return app;
 }

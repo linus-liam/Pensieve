@@ -1,5 +1,6 @@
 import { LocalReflection } from "./components/reflection/LocalReflection";
 import { LocalSettings } from "./components/reflection/LocalSettings";
+import { MaterialLibrary } from "./imports/MaterialLibrary";
 import type { LocalInfo } from "./sessionTypes";
 import { localMode } from "./local";
 import { pensieveTheme } from "./theme";
@@ -30,8 +31,8 @@ import { SideNav } from "./components/reflection/SideNav";
 import { Timeline } from "./components/reflection/Timeline";
 import type { Memory, MemoryEntry } from "./types";
 
-type Page = "capture" | "memories" | "detail";
-type NavPage = "capture" | "memories";
+type Page = "capture" | "memories" | "detail" | "materials";
+type NavPage = "capture" | "memories" | "materials";
 
 interface RouteState {
   page: Page;
@@ -108,6 +109,8 @@ function getRouteFromHash(): RouteState {
 
   const hash = window.location.hash.replace(/^#\/?/, "");
 
+  if (localMode && hash === "materials") return { page: "materials", selectedId: null };
+
   if (hash === "memories") return { page: "memories", selectedId: null };
   if (hash.startsWith("memory/")) {
     const id = hash.slice("memory/".length);
@@ -120,12 +123,14 @@ function getRouteFromHash(): RouteState {
 }
 
 function getHashForRoute(page: Page, selectedId: string | null) {
+  if (page === "materials") return "#materials";
   if (page === "memories") return "#memories";
   if (page === "detail" && selectedId) return `#memory/${encodeURIComponent(selectedId)}`;
   return "#capture";
 }
 
 function getActiveNavPage(page: Page): NavPage {
+  if (page === "materials") return "materials";
   return page === "capture" ? "capture" : "memories";
 }
 
@@ -380,7 +385,7 @@ function AuthenticatedApp() {
                     </Alert>
                   ) : null}
                   {localMode ? <LocalReflection info={localInfo} onConfirmed={() => void loadEntries()} historyOpen={historyOpen} onHistoryClose={() => setHistoryOpen(false)} onOpenSettings={() => setSettingsOpen(true)}>
-                    <CaptureComposer canSave={canSave} messages={captureMessages} saving={saving} value={draft} onChange={setDraft} onSave={saveMemory} />
+                    <Button variant="light" onClick={() => navigate("materials")}>导入过去的讨论</Button>
                   </LocalReflection> : <CaptureComposer
                     canSave={canSave}
                     messages={captureMessages}
@@ -391,6 +396,8 @@ function AuthenticatedApp() {
                   />}
                 </Stack>
               ) : null}
+
+              {localMode && page === "materials" && <MaterialLibrary onSettings={() => setSettingsOpen(true)} />}
 
               {page === "memories" ? (
                 <Stack gap="md">

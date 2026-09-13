@@ -1,10 +1,16 @@
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, readdir, readFile, writeFile, rename, rm, lstat } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdir, open, readdir, readFile, writeFile, rename, rm, lstat } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { verifyMaterial } from "../imports/materials.js";
 
 const recordName = /^[0-9a-f-]{36}\.json$/;
+const materialName = /^[0-9a-f]{64}\.json$/;
 const snapshotName = /^snapshot-[0-9T-]+-[0-9a-f-]{36}$/;
 const hash = (value: Buffer | string) => createHash("sha256").update(value).digest("hex");
+async function syncDirectory(path: string) {
+  const handle = await open(path, "r");
+  try { await handle.sync(); } finally { await handle.close(); }
+}
 interface Manifest {
   format: 1; created_at: string; digest: string;
   files: { path: string; sha256: string; bytes: number }[];
@@ -60,19 +66,25 @@ export class LocalBackups {
   private async snapshot() {
     await mkdir(this.source, { recursive: true, mode: 0o700 });
     const paths: string[] = [];
-    for (const prefix of ["", "sessions"]) {
+    for (const prefix of ["", "sessions", "materials"]) {
       const folder = join(this.source, prefix);
+      const info = await lstat(folder).catch((e: NodeJS.ErrnoException) => { if (e.code === "ENOENT") return null; throw e; });
+      if (info?.isSymbolicLink()) throw new Error("备份源目录不能是符号链接");
       const entries = await readdir(folder, { withFileTypes: true }).catch((error: NodeJS.ErrnoException) => {
         if (error.code === "ENOENT") return [];
         throw error;
       });
-      for (const entry of entries) if (entry.isFile() && recordName.test(entry.name)) paths.push(prefix ? `${prefix}/${entry.name}` : entry.name);
+      for (const entry of entries) if (entry.isFile() && (prefix === "materials" ? materialName : recordName).test(entry.name)) paths.push(prefix ? `${prefix}/${entry.name}` : entry.name);
     }
     paths.sort();
     const contents = await Promise.all(paths.map(async path => {
       const bytes = await readFile(join(this.source, path));
       // Stores replace complete JSON files atomically. Do not bless a corrupt file as a valid snapshot.
-      JSON.parse(bytes.toString("utf8"));
+      const record = JSON.parse(bytes.toString("utf8"));
+      if (path.startsWith("materials/")) {
+        await verifyMaterial(record);
+        if (path !== `materials/${record.id}.json`) throw new Error("原件编号与路径不一致");
+      }
       return { path, bytes };
     }));
     const files = contents.map(file => ({ path: file.path, sha256: hash(file.bytes), bytes: file.bytes.length }));
@@ -86,11 +98,15 @@ export class LocalBackups {
     try {
       await mkdir(temporary, { mode: 0o700 });
       for (const file of contents) {
-        if (file.path.startsWith("sessions/")) await mkdir(join(temporary, "sessions"), { recursive: true, mode: 0o700 });
+        if (file.path.includes("/")) await mkdir(join(temporary, file.path.split("/")[0]), { recursive: true, mode: 0o700 });
         await writeFile(join(temporary, file.path), file.bytes, { mode: 0o600, flush: true });
       }
       await writeFile(join(temporary, "manifest.json"), JSON.stringify(manifest, null, 2), { mode: 0o600, flush: true });
+      for (const prefix of new Set(contents.filter(f => f.path.includes("/")).map(f => f.path.split("/")[0]))) await syncDirectory(join(temporary, prefix));
+      await syncDirectory(temporary);
       await rename(temporary, join(this.directory, name));
+      await syncDirectory(this.directory);
+      await syncDirectory(dirname(this.directory));
     } finally { await rm(temporary, { recursive: true, force: true }); }
 
     // Keep the latest 20 snapshots plus one per day for the latest 30 days with backups.
@@ -111,20 +127,27 @@ export async function restoreLocalBackup(snapshot: string, destination: string) 
   const contents: { path: string; bytes: Buffer }[] = [];
   const names = new Set<string>();
   for (const file of manifest.files) {
-    if (!/^(sessions\/)?[0-9a-f-]{36}\.json$/.test(file.path) || names.has(file.path)) throw new Error("备份文件路径无效");
+    if (!( /^(sessions\/)?[0-9a-f-]{36}\.json$/.test(file.path) || /^materials\/[0-9a-f]{64}\.json$/.test(file.path)) || names.has(file.path)) throw new Error("备份文件路径无效");
     names.add(file.path);
-    if (file.path.startsWith("sessions/") && (await lstat(join(snapshot, "sessions"))).isSymbolicLink()) throw new Error("备份目录不能是符号链接");
+    if (file.path.includes("/") && (await lstat(join(snapshot, file.path.split("/")[0]))).isSymbolicLink()) throw new Error("备份目录不能是符号链接");
     if (!(await lstat(join(snapshot, file.path))).isFile()) throw new Error("备份文件类型无效");
     const bytes = await readFile(join(snapshot, file.path));
     if (bytes.length !== file.bytes || hash(bytes) !== file.sha256) throw new Error("备份文件校验失败");
-    JSON.parse(bytes.toString("utf8"));
+    const record = JSON.parse(bytes.toString("utf8"));
+    if (file.path.startsWith("materials/")) {
+      await verifyMaterial(record);
+      if (file.path !== `materials/${record.id}.json`) throw new Error("原件编号与路径不一致");
+    }
     contents.push({ path: file.path, bytes });
   }
   // A new directory is required: restoring never overwrites live memories.
   await mkdir(destination, { mode: 0o700 });
   for (const file of contents) {
-    if (file.path.startsWith("sessions/")) await mkdir(join(destination, "sessions"), { recursive: true, mode: 0o700 });
+    if (file.path.includes("/")) await mkdir(join(destination, file.path.split("/")[0]), { recursive: true, mode: 0o700 });
     await writeFile(join(destination, file.path), file.bytes, { flag: "wx", mode: 0o600, flush: true });
   }
+  for (const prefix of new Set(contents.filter(f => f.path.includes("/")).map(f => f.path.split("/")[0]))) await syncDirectory(join(destination, prefix));
+  await syncDirectory(destination);
+  await syncDirectory(dirname(destination));
   return contents.length;
 }

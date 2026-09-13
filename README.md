@@ -157,3 +157,7 @@ createdb -U pensieve pensieve_test
 cd backend
 TEST_DATABASE_URL=postgres://pensieve:pensieve@localhost:5433/pensieve_test npm test
 ```
+
+## 导入过去的讨论
+
+在本机版或手机版导航打开「原材料」，选择 ZIP、Markdown、TXT，或直接粘贴文字，预览后保存。原件完整保留，不调用 AI；可下载原文件及能在 Mac／手机恢复的单份备份，现有完整备份也包含原材料。文件范围、限制和恢复说明见 [原材料导入](docs/raw-material-import.md)。

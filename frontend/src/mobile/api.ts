@@ -1,6 +1,8 @@
 import type { ReflectionSession, LocalInfo } from "../sessionTypes";
 import type { MemoryRevision } from "../api/client";
 import { all, change, get, snapshot, type StoredEntry } from "./store";
+import { makeMaterial, readMaterialBackup, summary, verifyMaterial, type RawMaterial } from "../../../backend/src/imports/materials";
+import { readInWorker } from "../imports/readInWorker";
 
 const now = () => new Date().toISOString();
 const id = () => crypto.randomUUID();
@@ -62,6 +64,27 @@ export async function mobileRequest<T>(path: string, init?: RequestInit): Promis
   const body = init?.body ? JSON.parse(String(init.body)) : {};
   let result: unknown;
   if (parts[0] === "local-info") result = await mobileInfo();
+  else if (parts[0] === "materials") {
+    if (method === "GET" && parts[1]) {
+      const record = await get<RawMaterial>("materials", parts[1]);
+      if (!record) throw new Error("这份原材料不在当前设备。");
+      result = await verifyMaterial(record);
+    } else if (method === "GET") {
+      const records = await all<RawMaterial>("materials");
+      const summaries = [];
+      for (const record of records) summaries.push(summary(await verifyMaterial(record)));
+      result = summaries.sort((a, b) => b.imported_at.localeCompare(a.imported_at));
+    } else if (method === "POST" && (!parts[1] || parts[1] === "restore")) {
+      const record = parts[1] === "restore" ? await readMaterialBackup(body) : await makeMaterial(body);
+      await readInWorker(record);
+      let duplicate = false;
+      const saved = await change<RawMaterial>("materials", record.id, existing => {
+        if (existing) { duplicate = true; return existing; }
+        return record;
+      });
+      result = { material: summary(await verifyMaterial(saved)), duplicate };
+    } else throw new Error("不支持的原材料操作");
+  }
   else if (parts[0] === "sessions") {
     const sessionId = parts[1]; const action = parts[2];
     if (!sessionId) {
@@ -113,7 +136,7 @@ export async function mobileRequest<T>(path: string, init?: RequestInit): Promis
   } else if (parts[0] === "memory-entries") {
     const memoryId = parts[1];
     if (!memoryId && method === "GET") {
-      const backup = await snapshot();
+      const backup = await snapshot(false);
       result = [...backup.sessions.map(s => s.memory_revisions.at(-1)), ...backup.entries.map(e => e.revisions.at(-1))].filter((r): r is MemoryRevision => Boolean(r) && (r as MemoryRevision).archived === (url.searchParams.get("archived") === "true")).sort((a, b) => b.created_at.localeCompare(a.created_at));
     } else if (!memoryId) {
       const content = raw(body.rawInput, 500000); const memoryId = id();
@@ -134,7 +157,7 @@ export async function mobileRequest<T>(path: string, init?: RequestInit): Promis
   return result as T;
 }
 export async function exportMobileMarkdown() {
-  const backup = await snapshot();
+  const backup = await snapshot(false);
   const sessions = backup.sessions.map(s => `## 聊天 ${s.id}\n\n${s.created_at}\n\n` + s.messages.map(m => `### ${m.role} · ${m.created_at}\n\n${m.content}\n`).join("\n") + "\n### 回顾草稿（未经确认）\n\n" + s.drafts.map(d => `${d.author === "user" ? "用户修改" : "AI"} · ${d.created_at}\n\n${d.text}\n`).join("\n") + "\n### 确认与修改历史\n\n" + s.memory_revisions.map(r => `${r.updated_at}\n\n${r.raw_input}\n`).join("\n"));
   const entries = backup.entries.map(e => `## 文字存档 ${e.id}\n\n` + e.revisions.map(r => `${r.action} · ${r.updated_at}\n\n${r.raw_input}\n`).join("\n"));
   download([...sessions, ...entries].join("\n---\n\n"), "pensieve-memories.md", "text/markdown;charset=utf-8");

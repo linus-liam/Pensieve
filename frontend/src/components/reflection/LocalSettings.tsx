@@ -39,6 +39,7 @@ export function LocalSettings({ opened, onClose, info, onInfo }: {
         <Text size="sm">完整聊天会自动保存；回顾经你确认后进入记忆。</Text>
         <Text size="xs" c="dimmed" style={{ overflowWrap: "anywhere" }}>存储目录：{info?.directory ?? "正在连接…"}</Text>
         <Button variant="default" onClick={() => void api.exportMarkdown().catch(e => setError(e.message))}>导出全部记忆与历史（Markdown）</Button>
+        <Text size="sm" c="dimmed">这份 Markdown 包含聊天与记忆。导入的 ZIP、Markdown 和文字原件另在「原材料」中，可逐份下载可恢复备份；下方完整备份也包含它们。</Text>
       </Stack>
       {mobileMode ? <PhoneSettings info={info} onConnected={async () => onInfo(await api.localInfo())} /> : <Stack gap="sm">
         <Title order={3} size="h4">自动备份</Title>

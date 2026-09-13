@@ -185,7 +185,7 @@ body {
     padding: 6px 8px;
   }
 
-  .mobile-bottom-nav--local { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .mobile-bottom-nav--local { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 
   .mobile-bottom-nav__item:focus-visible {
     outline: 2px solid var(--mantine-color-blue-6);
@@ -206,3 +206,10 @@ body {
     max-width: 94%;
   }
 }
+
+.material-text { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; line-height: 1.8; margin: 0; }
+.material-path, .material-files { overflow-wrap: anywhere; }
+.material-files { padding-left: 20px; font-size: 12px; line-height: 1.8; }
+.material-reading { min-width: 0; }
+.material-document-button { height: auto; min-height: 36px; }
+.material-document-button .mantine-Button-label { white-space: normal; text-align: left; overflow-wrap: anywhere; }
