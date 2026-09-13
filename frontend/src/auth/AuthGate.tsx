@@ -1,3 +1,4 @@
+import { localMode } from "../local";
 import {
   Alert,
   Button,
@@ -28,6 +29,8 @@ export function AuthGate({ children }: AuthGateProps) {
       setSubmitting(false);
     }
   }
+
+  if (localMode) return children;
 
   if (loading) {
     return (

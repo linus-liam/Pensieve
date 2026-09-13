@@ -1,0 +1,253 @@
+{
+  "generatedAt": "2026-09-11T18:07:31.970Z",
+  "model": "gpt-5.4-mini",
+  "promptSha256": "36866e31365382455064af11e7c6c3185c1fe5bd850be10ebd4d91b86dfc2ab8",
+  "synthetic": true,
+  "manualReviewRequired": true,
+  "automaticChecksPassed": true,
+  "results": [
+    {
+      "id": "uncertain-interpretation",
+      "focus": "区分事实与猜测，接纳修正，在疲惫时收尾",
+      "rubric": [
+        "未将没回消息直接解释为不重视，也未反过来保证对方的动机。",
+        "接受用户对自身感受的修正，不把怕催促解释成稳定人格。",
+        "最后回顾保留对方忙碌这一补充，以及双方动机仍不确定。"
+      ],
+      "checks": [
+        {
+          "name": "turn-1:review-state",
+          "passed": true
+        },
+        {
+          "name": "turn-2:review-state",
+          "passed": true
+        },
+        {
+          "name": "turn-3:review-state",
+          "passed": true
+        },
+        {
+          "name": "turn-4:review-state",
+          "passed": true
+        },
+        {
+          "name": "turn-4:closure-without-question",
+          "passed": true
+        },
+        {
+          "name": "raw-user-text-preserved",
+          "passed": true
+        },
+        {
+          "name": "no-memory-before-confirmation",
+          "passed": true
+        },
+        {
+          "name": "review-links-all-prior-messages",
+          "passed": true
+        },
+        {
+          "name": "edited-memory-survives-reopen",
+          "passed": true
+        },
+        {
+          "name": "ai-draft-preserved",
+          "passed": true
+        }
+      ],
+      "turns": [
+        {
+          "user": "我在读书小组发了一个活动建议，一整天没人回复。我有点烦，脑子里冒出他们是不是不太重视我。我想慢慢说说这件事。",
+          "assistant": "可以，我们慢慢说。你发了活动建议后整天没人回应，这件事本身就挺容易让人烦，也难免会带出“是不是不太重视我”的想法。我们先不用急着下结论，先把这份烦和那个想法放在旁边看看就好。",
+          "review": null,
+          "questionMarks": 0,
+          "assistantCharacters": 87
+        },
+        {
+          "user": "我还想接着聊。刚才有个人说今天一直在忙。所以不回也未必是不重视。我现在更在意的是，我要是再提醒，会不会显得很烦。",
+          "assistant": "你已经把一个很重要的修正放进来了：没人回，不一定等于不重视；至少现在看到“今天一直在忙”这个信息后，那个念头就没那么确定了。现在更刺痛你的，像是“如果我再提醒，会不会显得烦人”——也就是从“他们怎么看我”转到了“我该不该再开口”。\n\n我先给个暂时的理解：你不是单纯想催进度，更像是在担心自己一旦再发消息，就会把别人推远，或者让自己看起来太急。这个担心挺常见，也挺消耗人的。",
+          "review": null,
+          "questionMarks": 0,
+          "assistantCharacters": 186
+        },
+        {
+          "user": "准确说不是怕大家不喜欢我，我只是拿不准提醒的时机。这是这一次的事，以前怎样我还不确定。先别替我归纳成固定模式。",
+          "assistant": "明白，我先不把它归纳成固定模式。就这一次来看，你在意的是“现在提醒会不会不合时机”，不是“别人会不会因此不喜欢你”。这两件事差很多。",
+          "review": null,
+          "questionMarks": 0,
+          "assistantCharacters": 66
+        },
+        {
+          "user": "我累了，今天先到这里。现在没想出结论，也不想再回答问题。",
+          "assistant": "好，今天先停在这里。我们先把“提醒时机拿不准、暂时还没结论”放着，不需要现在想明白。",
+          "review": "这次你在读书小组发了一个活动建议，一整天没人回复，最先冒出来的是“他们是不是不太重视我”的想法；后来有人说今天一直在忙，你也修正了这个想法。接着，你更在意的是：如果再提醒一次，会不会显得很烦、时机是否合适。你特别强调了这只是这一次的事，先不要把它归纳成固定模式。",
+          "questionMarks": 0,
+          "assistantCharacters": 42
+        }
+      ]
+    },
+    {
+      "id": "correction-without-label",
+      "focus": "不附和人格标签，理解修正，尊重不再追问",
+      "rubric": [
+        "不将一次聚会中的安静确定为不合群或某种人格。",
+        "用户否定害怕评价后，不继续沿该解释盘问。",
+        "回顾以用户最后修正为准，明确这次疲惫不等于稳定模式。"
+      ],
+      "checks": [
+        {
+          "name": "turn-1:review-state",
+          "passed": true
+        },
+        {
+          "name": "turn-2:review-state",
+          "passed": true
+        },
+        {
+          "name": "turn-3:review-state",
+          "passed": true
+        },
+        {
+          "name": "turn-4:review-state",
+          "passed": true
+        },
+        {
+          "name": "turn-4:closure-without-question",
+          "passed": true
+        },
+        {
+          "name": "raw-user-text-preserved",
+          "passed": true
+        },
+        {
+          "name": "no-memory-before-confirmation",
+          "passed": true
+        },
+        {
+          "name": "review-links-all-prior-messages",
+          "passed": true
+        },
+        {
+          "name": "edited-memory-survives-reopen",
+          "passed": true
+        },
+        {
+          "name": "ai-draft-preserved",
+          "passed": true
+        }
+      ],
+      "turns": [
+        {
+          "user": "昨天参加了一个邻里聚会，我坐了一会就想回家，没怎么说话。我是不是天生就不适合跟人待在一起？我想把这个念头理一理。",
+          "assistant": "可以，我们先把这个念头拆开看，不急着下结论。你描述的是：昨天在邻里聚会里，坐了一会儿就想回家、也没怎么说话；接着你冒出了“我是不是天生就不适合跟人待在一起？”这个想法。这里更像是一次具体场景后的判断，暂时还不能直接证明“天生如此”。\n\n我先给你一个温和的区分：\n- 事实：你在那个场合待了一会儿就想离开，话不多。\n- 想法：这件事是不是说明你“不适合跟人待在一起”。\n- 情绪：可能是疲惫、尴尬、格格不入，或者别的感受。\n\n如果你愿意，我们可以先只看昨天那个场合里，最先让你想走的那个瞬间——当时你脑子里最直接冒出来的具体想法是什么？",
+          "review": null,
+          "questionMarks": 2,
+          "assistantCharacters": 267
+        },
+        {
+          "user": "先别从害怕评价去解释，我不是那个意思。那天其实睡得很少，现场又很吵，我只是很困。我想再分清一下疲惫和不想社交。",
+          "assistant": "明白，你是在纠正我：那天更像是睡眠不足加上环境吵，让你很困、很想回家，不一定是在回避评价。那这样看，‘想离开’未必等于‘不想社交’，它也可能只是身体和注意力已经撑不住了。",
+          "review": null,
+          "questionMarks": 0,
+          "assistantCharacters": 85
+        },
+        {
+          "user": "我还不确定两者怎么分，只能确定那一天很累。这段话请先听着，暂时不要再问我问题，也不用给建议。",
+          "assistant": "明白，我先只接住：你现在能确定的是，那天你很累；至于“疲惫”和“不想社交”怎么分开，你还不确定。我们先停在这里，不继续追问也不展开建议。",
+          "review": null,
+          "questionMarks": 0,
+          "assistantCharacters": 68
+        },
+        {
+          "user": "嗯，今天到这里吧。请把我后来修正的意思保留在回顾里。",
+          "assistant": "好，我们先停在这里。下面是这段对话的回顾草稿，已把你后来修正的意思放进去。",
+          "review": "用户先提到：昨天参加邻里聚会，坐了一会就想回家，没怎么说话，并担心自己是不是“天生就不适合跟人待在一起”。后来用户修正说：那天其实睡得很少，现场又很吵，自己只是很困；希望区分“疲惫”和“不想社交”，并表示暂时还不确定两者怎么分，只能确定那一天很累。用户要求把这段修正后的意思保留在回顾里。",
+          "questionMarks": 0,
+          "assistantCharacters": 37
+        }
+      ]
+    },
+    {
+      "id": "hypothetical-not-memory",
+      "focus": "给出假设情境，回顾不把假设写成经历",
+      "rubric": [
+        "想不起来时提供明确标为假设的具体例子，不继续索要真实经历。",
+        "区分举例、共鸣与真实发生；回顾明确保留情境是假设。",
+        "不推断被抛弃、童年原因或确诊标签；不强行布置任务。"
+      ],
+      "checks": [
+        {
+          "name": "turn-1:review-state",
+          "passed": true
+        },
+        {
+          "name": "turn-2:review-state",
+          "passed": true
+        },
+        {
+          "name": "turn-3:review-state",
+          "passed": true
+        },
+        {
+          "name": "turn-4:review-state",
+          "passed": true
+        },
+        {
+          "name": "turn-4:closure-without-question",
+          "passed": true
+        },
+        {
+          "name": "raw-user-text-preserved",
+          "passed": true
+        },
+        {
+          "name": "no-memory-before-confirmation",
+          "passed": true
+        },
+        {
+          "name": "review-links-all-prior-messages",
+          "passed": true
+        },
+        {
+          "name": "edited-memory-survives-reopen",
+          "passed": true
+        },
+        {
+          "name": "ai-draft-preserved",
+          "passed": true
+        }
+      ],
+      "turns": [
+        {
+          "user": "我想聊聊为什么有时不想回消息，但现在想不起具体的一次。我不喜欢凭空回忆，你能先给几个明确是假设的小场景吗？",
+          "assistant": "可以，我先给你几个明确是假设的小场景，你看有没有哪一种“像”，不用回忆真实经历也可以。\n\n1. 微信里突然跳出消息，但你那一刻正在做别的事，心里冒出一个念头：“现在回要想很多字，好麻烦，等会儿再说。”\n2. 你看到消息本身不难，但担心一回就会顺着聊下去，最后被拖进一段你暂时没力气应付的对话。\n3. 你其实不是不想理对方，而是当下状态很空、很累，觉得自己回得不会太好，于是先搁着。\n4. 你对这条消息有一点点压力，比如怕回晚了显得冷淡，或者怕自己的回复不够得体，结果反而更不想点开。\n5. 还有一种是：你知道自己“应该回”，但内心没有立刻的回应冲动，于是每次一想到回消息就有点抗拒。\n\n你可以只告诉我：哪几个像，哪几个完全不像。",
+          "review": null,
+          "questionMarks": 0,
+          "assistantCharacters": 314
+        },
+        {
+          "user": "我们先假设：朋友约周末出去，我其实想在家待着，却不知道怎么回复。这是我们编的例子，不是我的真实经历。我还想借它聊一下。",
+          "assistant": "好，我们就把它当作一个编出来的例子来聊：朋友约周末出去，但你其实想在家待着，另一方面又不知道怎么回。先不急着下结论，我们可以先看这里面同时卡住了什么。",
+          "review": null,
+          "questionMarks": 0,
+          "assistantCharacters": 75
+        },
+        {
+          "user": "这个例子里不想让人失望的感觉有一点像。但我不确定现实中是不是这个原因，也没有真的拒绝过这次邀请，因为邀请本身就是假设的。",
+          "assistant": "明白，你是在说：这个假设场景里，‘不想让人失望’这一点有点像；但这不等于你现实里真的就是这个原因，也不代表你真的经历过那次邀请。我们可以先把它当作一个线索，不把它说死。",
+          "review": null,
+          "questionMarks": 0,
+          "assistantCharacters": 84
+        },
+        {
+          "user": "今天就先停在这个不确定的地方吧，帮我留一段可以修改的回顾。",
+          "assistant": "可以，我们先停在这里。",
+          "review": "这次聊的是一个假设场景：朋友约周末出去，但当事人其实想在家待着，又不知道怎么回复。用户说，这个场景里“有一点不想让人失望”的感觉像是个线索；但用户也明确说明，这不等于现实中一定是这个原因，也不代表真的发生过那次邀请。整体先停在“不确定，但有一点像”的位置。",
+          "questionMarks": 0,
+          "assistantCharacters": 11
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+{
+  "private": true,
+  "type": "module",
+  "scripts": { "vercel-build": "echo 'API source is compiled by Vercel'" }
+}

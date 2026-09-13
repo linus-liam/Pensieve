@@ -1,4 +1,5 @@
 export interface MemoryEntry {
+  source_session_id?: string;
   id: string;
   user_id: string;
   raw_input: string;
@@ -14,6 +15,7 @@ export interface CapturedMemoryEntry extends MemoryEntry {
 export type MemorySourceType = "text" | "screenshot" | "photo" | "voice";
 
 export interface Memory {
+  sourceSessionId?: string;
   id: string;
   day: string;
   time: string;
