@@ -66,3 +66,5 @@
 验证命令：`npm test --workspace backend`、`npm test --workspace frontend`、`npm run typecheck --workspaces`、`npm run build:backend`、`npm run build:mobile`。
 
 本次验证结果（2026-09-14）：后端 35 项通过、9 项依赖云端数据库的既有测试跳过；前端 32 项通过，类型检查与后端／手机生产构建通过。内置浏览器通过隔离的 `127.0.0.1:4789` 原点验证了纯文字保存、合成 ChatGPT ZIP 选择／预览／保存、刷新后重读及 390 px 手机导航布局。备份下载按钮显示已交给浏览器，自动化未收到下载完成事件；未据此认定文件已落到独立设备。真实 iPhone Safari 和用户实际导出尚未实测。
+
+CI 暴露的 Node 20／jsdom 跨环境 ArrayBuffer 兼容问题已修正：SHA-256 接收字节视图，校验算法和原件格式不变。已在 Node 20.20.2 本地重跑相关前端 10 项并全部通过。

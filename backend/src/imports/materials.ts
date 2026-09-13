@@ -17,7 +17,9 @@ export class ImportError extends Error {}
 export function fail(message: string): never { throw new ImportError(message); }
 
 export async function sha256(bytes: Uint8Array): Promise<string> {
-  return Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new Uint8Array(bytes).buffer)), b => b.toString(16).padStart(2, "0")).join("");
+  // Pass a byte view: Node 20 WebCrypto rejects a foreign-realm ArrayBuffer
+  // (e.g. jsdom), but accepts its typed-array view, as browsers do.
+  return Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new Uint8Array(bytes))), b => b.toString(16).padStart(2, "0")).join("");
 }
 export function toBase64(bytes: Uint8Array): string {
   let text = "";
