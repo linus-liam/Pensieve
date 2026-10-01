@@ -29,6 +29,7 @@ The existing mobile web preview remains a record of the previous implementation.
 - Private AI configuration supplied by Linus and Liam.
 - Natural AI response and useful follow-up questions.
 - Evidence-informed stopping behavior drawing on psychology and cognitive science; the detailed behavior still needs product definition and evaluation.
+- At a likely stopping point, stop introducing new questions and respond naturally. If it remains unclear whether the user wants to continue, gently ask whether to pause. Never close the session automatically.
 - Complete conversation retention is required; generating a formal review or confirmed summary at the end is not required in this phase.
 - Small, reversible increments shaped by Linus's actual daily use.
 
@@ -38,7 +39,7 @@ The existing mobile web preview remains a record of the previous implementation.
 - A new user message is committed to local storage before an AI failure can lose it.
 - A complete synthetic conversation survives app termination and relaunch.
 - An upgrade or migration check demonstrates that a later build can read the earlier build's local data.
-- Synthetic conversation checks cover at least an explicit request to stop, a user who still wants to continue, and a conversation where further questions no longer add clarity. The AI must not keep asking after an explicit stop and must not end merely because the user corrected its understanding.
+- Synthetic conversation checks cover at least an explicit request to stop, a user who still wants to continue, and a conversation where further questions no longer add clarity. The AI must not keep asking after an explicit stop, must not end merely because the user corrected its understanding, and must leave the final stop decision to the user.
 - Credentials, personal conversations and local app data are excluded from Git and test fixtures.
 - Linus can complete the first real daily-use conversation and report the largest workflow friction.
 
@@ -82,6 +83,8 @@ Linus's exact words:
 When asked for the minimum AI behavior in the first build, Linus answered:
 
 > A，以及最好能根据心理学和认知科学里面的一些内容决定什么时候该停
+
+Linus accepted the combined stopping behavior: stop asking and respond naturally first; gently ask whether to pause only when needed.
 
 Liam agreed to convert the current implementation to iOS, said local storage was straightforward, accepted that the first build is only for the two founders, and distinguished it from a public release that will require stronger security.
 
