@@ -6,6 +6,8 @@ serves the timeline/detail flow.
 
 ## iPhone 个人试用
 
+> 当前下一步（2026-10-01）：先交付供 Linus 与 Liam 私用的 iOS 版本；不要求同步或登录，沿用当前流程与界面，在设备本地保留完整原始对话，并保证后续开发版本能够继续读取已有数据。范围与验收见 [`docs/ios-first-private-build.md`](docs/ios-first-private-build.md)。下方地址是此前已经部署的 Web Preview。
+
 手机地址：[Pensieve](https://pensieve-phone.vercel.app)。在 Safari 中打开，先添加到主屏幕，再从图标开始记录。网页与 AI 服务独立部署，Mac 不需要保持开机。当前服务已部署；AI 密钥上传到 Vercel 的明确授权仍待确认，因此线上暂可保存原文，尚不能回复。
 
 手机记录保存在当前设备，不会自动同步 Mac。请在设置中下载完整备份并保存到“文件”。连接、恢复、时间处理和本轮验收见 [手机试用说明](docs/mobile-preview.md)。
