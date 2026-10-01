@@ -14,9 +14,10 @@ The existing mobile web preview remains a record of the previous implementation.
 2. The app opens without account registration or login.
 3. Linus enters the private API configuration required for AI replies.
 4. He starts one chat and pours out his thoughts using the current Pensieve workflow.
-5. Every user message and the complete raw conversation are stored locally before or independently of successful AI processing.
-6. Closing and reopening the app restores the conversation.
-7. Installing a later development build preserves or deliberately migrates the existing local data so product iteration does not erase the material gathered through daily use.
+5. The AI responds naturally, asks useful follow-up questions and recognizes when further questioning is no longer useful.
+6. Every user message and the complete raw conversation are stored locally before or independently of successful AI processing.
+7. Closing and reopening the app restores the conversation.
+8. Installing a later development build preserves or deliberately migrates the existing local data so product iteration does not erase the material gathered through daily use.
 
 ## Scope
 
@@ -26,6 +27,9 @@ The existing mobile web preview remains a record of the previous implementation.
 - No cross-device sync.
 - No account system or login.
 - Private AI configuration supplied by Linus and Liam.
+- Natural AI response and useful follow-up questions.
+- Evidence-informed stopping behavior drawing on psychology and cognitive science; the detailed behavior still needs product definition and evaluation.
+- Complete conversation retention is required; generating a formal review or confirmed summary at the end is not required in this phase.
 - Small, reversible increments shaped by Linus's actual daily use.
 
 ## Acceptance
@@ -34,6 +38,7 @@ The existing mobile web preview remains a record of the previous implementation.
 - A new user message is committed to local storage before an AI failure can lose it.
 - A complete synthetic conversation survives app termination and relaunch.
 - An upgrade or migration check demonstrates that a later build can read the earlier build's local data.
+- Synthetic conversation checks cover at least an explicit request to stop, a user who still wants to continue, and a conversation where further questions no longer add clarity. The AI must not keep asking after an explicit stop and must not end merely because the user corrected its understanding.
 - Credentials, personal conversations and local app data are excluded from Git and test fixtures.
 - Linus can complete the first real daily-use conversation and report the largest workflow friction.
 
@@ -73,6 +78,10 @@ Linus's exact words:
 > The data will be save locally and when we iterate it we could still use those data
 
 > Do simple increment two ppl team we could change a lot
+
+When asked for the minimum AI behavior in the first build, Linus answered:
+
+> A，以及最好能根据心理学和认知科学里面的一些内容决定什么时候该停
 
 Liam agreed to convert the current implementation to iOS, said local storage was straightforward, accepted that the first build is only for the two founders, and distinguished it from a public release that will require stronger security.
 
