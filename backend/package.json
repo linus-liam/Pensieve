@@ -18,7 +18,7 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
-    "express-rate-limit": "^8.5.2",
+    "express-rate-limit": "^8.7.0",
     "helmet": "^8.1.0",
     "https-proxy-agent": "^7.0.6",
     "openai": "^4.77.0",
