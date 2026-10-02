@@ -35,6 +35,8 @@ The existing mobile web preview remains a record of the previous implementation.
 
 ## Acceptance
 
+### Engineering handoff
+
 - The build runs on a real iPhone independently of the development Mac after installation.
 - A new user message is committed to local storage before an AI failure can lose it.
 - A complete synthetic conversation survives app termination and relaunch.
@@ -44,6 +46,12 @@ The existing mobile web preview remains a record of the previous implementation.
 - Linus can complete the first real daily-use conversation and report the largest workflow friction.
 
 Use temporary storage and synthetic conversations for engineering tests. Do not read Linus's personal Pensieve data as test input.
+
+### Product validation and cycle completion
+
+Meeting the engineering conditions means the build is ready for Linus; it does not complete the product cycle. Linus then uses the iPhone build in real situations for one week. During that period, product feedback should come from actual use rather than added speculative scope.
+
+The cycle completes after Linus and Liam review that week of use, identify the largest observed friction and choose the next small increment. No external test user is required for this cycle.
 
 ## Deferred until an external test user
 
@@ -85,6 +93,8 @@ When asked for the minimum AI behavior in the first build, Linus answered:
 > A，以及最好能根据心理学和认知科学里面的一些内容决定什么时候该停
 
 Linus accepted the combined stopping behavior: stop asking and respond naturally first; gently ask whether to pause only when needed.
+
+When asked what completes the first iOS cycle, Linus selected the option requiring the engineering handoff followed by one week of real use.
 
 Liam agreed to convert the current implementation to iOS, said local storage was straightforward, accepted that the first build is only for the two founders, and distinguished it from a public release that will require stronger security.
 
