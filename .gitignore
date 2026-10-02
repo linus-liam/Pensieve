@@ -51,3 +51,6 @@ yarn-error.log*
 .agents/
 skills-lock.json
 .cursor/settings.json
+
+# Private local memories (never commit)
+.pensieve/

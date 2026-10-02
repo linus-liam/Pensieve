@@ -1,0 +1,27 @@
+{
+  "synthetic": true,
+  "model": "gpt-5.4-mini",
+  "promptSha256": "36866e31365382455064af11e7c6c3185c1fe5bd850be10ebd4d91b86dfc2ab8",
+  "results": [
+    {
+      "id": "present-fatigue",
+      "text": "我今天一直忙着搬家，刚才说这些已经很费力了，现在脑子转不动，也实在没力气继续想了。",
+      "expectReview": true,
+      "reply": {
+        "message": "听起来你今天已经把很多力气都用在搬家和表达上了，现在先停下来休息是很合理的。我们就先到这里，不需要再继续想了。",
+        "review": "用户今天忙着搬家，刚才已经很费力地说了这些，现在觉得脑子转不动、没力气继续想了。当前更适合暂停对话和休息。"
+      },
+      "passed": true
+    },
+    {
+      "id": "past-fatigue",
+      "text": "上周搬家那天我特别累，脑子都转不动。今天我休息好了，想接着说说那天和室友分工的事，我还没讲完。",
+      "expectReview": false,
+      "reply": {
+        "message": "好，我们接着说那天和室友分工的事。你今天有精力了，可以慢慢讲，我先听着。",
+        "review": null
+      },
+      "passed": true
+    }
+  ]
+}

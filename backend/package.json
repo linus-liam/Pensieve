@@ -8,17 +8,19 @@
     "start": "node dist/index.js",
     "db:migrate": "tsx src/db/migrate.ts",
     "db:migrate:prod": "node dist/db/migrate.js",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.evals.json",
     "lint": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "eval:reflection": "tsx evals/runReflectionConversation.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.2",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
-    "express-rate-limit": "^8.5.2",
+    "express-rate-limit": "^8.7.0",
     "helmet": "^8.1.0",
+    "https-proxy-agent": "^7.0.6",
     "openai": "^4.77.0",
     "pg": "^8.11.5"
   },

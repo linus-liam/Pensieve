@@ -37,7 +37,7 @@ body {
 
 .capture-chat__bubble {
   border: 1px solid var(--mantine-color-gray-3);
-  border-radius: 8px;
+  border-radius: var(--mantine-radius-md);
   max-width: min(86%, 560px);
   padding: 10px 12px;
 }
@@ -100,7 +100,51 @@ body {
   white-space: nowrap;
 }
 
+.reflection-transcript > summary {
+  color: var(--mantine-color-gray-6);
+  cursor: pointer;
+  font-size: var(--mantine-font-size-sm);
+  padding: 4px 0;
+}
+
+.reflection-transcript[open] > summary:not([hidden]) {
+  margin-bottom: 12px;
+}
+
+.reflection-review {
+  scroll-margin-block: 20px;
+  outline: none;
+}
+
+.reflection-review__actions {
+  flex-wrap: wrap;
+}
+
+.local-reflection { padding-top: 12px; }
+.local-reflection--empty { padding-top: clamp(32px, 14vh, 130px); }
+.reflection-greeting { padding: 0 12px 8px; }
+.reflection-greeting h2 { font-weight: 550; letter-spacing: 0.02em; }
+.reflection-composer { box-shadow: 0 6px 24px rgba(35, 48, 65, 0.025); }
+.reflection-composer:focus-within { border-color: var(--mantine-color-blue-3); }
+.reflection-composer textarea { font-size: 16px; line-height: 1.8; }
+.reflection-messages { max-height: 54vh; overflow-y: auto; padding: 4px; scrollbar-width: thin; }
+.reflection-message { margin-bottom: 22px; padding: 16px 18px; }
+.reflection-message--user { background: #edf1f5; border-radius: var(--mantine-radius-lg); margin-left: 12%; }
+.reflection-message--assistant { padding-left: 6px; padding-right: 6px; }
+.reflection-review { background: white; border-radius: var(--mantine-radius-lg); padding: 24px; }
+.reflection-import { color: var(--mantine-color-gray-6); font-size: 13px; padding: 0 12px; }
+.reflection-import > summary { cursor: pointer; }
+.reflection-history-item { width: 100%; border-radius: var(--mantine-radius-md); padding: 16px; }
+.reflection-history-item:hover, .reflection-history-item[data-active] { background: var(--mantine-color-gray-0); }
+.reflection-history-item:disabled { opacity: .55; cursor: default; }
+.reflection-history-item:focus-visible { outline: 2px solid var(--mantine-color-blue-5); }
+
 @media (max-width: 47.99em) {
+  .reflection-review {
+    padding: 20px;
+    scroll-margin-block-end: calc(100px + env(safe-area-inset-bottom, 0px));
+  }
+
   .app-content {
     padding-bottom: calc(76px + env(safe-area-inset-bottom));
   }
@@ -128,7 +172,7 @@ body {
     align-items: center;
     background: transparent;
     border: 0;
-    border-radius: 8px;
+    border-radius: var(--mantine-radius-md);
     color: var(--mantine-color-gray-7);
     display: flex;
     flex-direction: column;
@@ -140,6 +184,8 @@ body {
     min-height: 52px;
     padding: 6px 8px;
   }
+
+  .mobile-bottom-nav--local { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 
   .mobile-bottom-nav__item:focus-visible {
     outline: 2px solid var(--mantine-color-blue-6);
