@@ -10,7 +10,7 @@ This is the first native iPhone development build for Linus and Liam. It uses on
 4. Run the app. It opens without registration or login. It saves raw messages even when AI is off.
 5. On the device, open **Settings**, enter an OpenAI API key and enable AI replies. The current conversation is sent directly from this iPhone to OpenAI when generating a reply. Other conversations are not sent automatically. No key is bundled into the app. On a simulator, a test key stays in memory for the current app session only; it must be entered again after relaunch. On a physical iPhone, the key is stored in that device's Keychain.
 
-The app uses `gpt-4o-mini` by default; the model can be changed in Settings. Network access is required for AI replies. An explicit whole-message stop request is acknowledged locally without another model question. The app never automatically closes a conversation.
+The app uses `gpt-4o-mini` by default; the model can be changed in Settings. Network access is required for AI replies. A message saved while AI is off can receive a reply later through **生成 / 重试 AI 回复** after AI is enabled. An explicit whole-message stop request is acknowledged locally without another model question. The app never automatically closes a conversation.
 
 ## Engineering checks
 
@@ -28,6 +28,7 @@ Before handing the build to Linus, check on a real iPhone:
 2. Send a synthetic message with AI disabled, force quit, relaunch, and verify the exact text is still present.
 3. Enter a private key on the device, enable AI, send a synthetic message, and verify an AI reply. Do not put the key or personal conversation in logs, fixtures or Git.
 4. Test a failed AI request, then retry. The original user message must remain visible and saved.
+   Also save a message with AI off, then enable AI and generate its reply.
 5. Test explicit stopping, correction with continued discussion, and a conversation where further questions stop adding clarity. The user must always control whether the chat continues.
 6. Install a later build with the same bundle ID over the first. Verify earlier messages still open, and export the archive from Settings as a separate backup.
 

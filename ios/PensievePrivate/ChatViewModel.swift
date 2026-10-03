@@ -36,6 +36,13 @@ final class ChatViewModel: ObservableObject {
 
     var archiveURL: URL? { repository?.fileURL }
 
+    var canRetryLastReply: Bool {
+        selectedConversation?.messages.last?.role == .user &&
+            !isGenerating &&
+            UserDefaults.standard.bool(forKey: "aiEnabled") &&
+            PrivateKeyStore.read() != nil
+    }
+
     func select(_ id: UUID?) { selectedID = id; errorMessage = nil }
 
     @discardableResult
@@ -70,10 +77,8 @@ final class ChatViewModel: ObservableObject {
     }
 
     func retryLastReply() {
-        guard let conversation = selectedConversation,
-              conversation.messages.last?.role == .user,
-              !isGenerating,
-              UserDefaults.standard.bool(forKey: "aiEnabled"),
+        guard canRetryLastReply,
+              let conversation = selectedConversation,
               let key = PrivateKeyStore.read() else { return }
         generateReply(to: conversation.id, key: key)
     }
@@ -93,7 +98,9 @@ final class ChatViewModel: ObservableObject {
                 refresh()
                 errorMessage = nil
             } catch {
-                errorMessage = "Your message is saved. \(error.localizedDescription)"
+                if selectedID == id {
+                    errorMessage = "Your message is saved. \(error.localizedDescription)"
+                }
             }
             isGenerating = false
         }

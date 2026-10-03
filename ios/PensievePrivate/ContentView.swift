@@ -7,6 +7,10 @@ struct ContentView: View {
     @State private var showingSettings = false
     @FocusState private var composerFocused: Bool
 
+    private var hasUnsentDraft: Bool {
+        !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
@@ -29,11 +33,13 @@ struct ContentView: View {
                     Button { showingHistory = true } label: {
                         Label("Past conversations", systemImage: "clock.arrow.circlepath")
                     }
+                    .disabled(hasUnsentDraft || model.isGenerating)
                 }
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     Button { newConversation() } label: {
                         Label("New conversation", systemImage: "square.and.pencil")
                     }
+                    .disabled(hasUnsentDraft || model.isGenerating)
                     Button { showingSettings = true } label: {
                         Label("Settings", systemImage: "gearshape")
                     }
@@ -73,14 +79,15 @@ struct ContentView: View {
                     if let error = model.errorMessage {
                         VStack(alignment: .leading, spacing: 10) {
                             Text(error).foregroundStyle(.red)
-                            if model.selectedConversation?.messages.last?.role == .user {
-                                Button("重试 AI 回复") { model.retryLastReply() }
-                            }
                         }
                         .font(.footnote)
                         .padding(12)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(.white, in: RoundedRectangle(cornerRadius: 14))
+                    }
+                    if model.selectedConversation?.messages.last?.role == .user {
+                        Button("生成 / 重试 AI 回复") { model.retryLastReply() }
+                            .disabled(!model.canRetryLastReply)
                     }
                 }
                 .padding(.horizontal, 18)
@@ -185,6 +192,7 @@ struct ContentView: View {
     }
 
     private func newConversation() {
+        guard !hasUnsentDraft, !model.isGenerating else { return }
         model.select(nil)
         draft = ""
         composerFocused = true
