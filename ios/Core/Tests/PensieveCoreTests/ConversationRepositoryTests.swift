@@ -41,6 +41,18 @@ final class ConversationRepositoryTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: url), future)
     }
 
+    func testVersionOneArchiveFixtureRemainsReadable() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let fixture = """
+        {"schemaVersion":1,"conversations":[{"id":"00000000-0000-0000-0000-000000000001","createdAt":0,"updatedAt":0,"messages":[{"id":"00000000-0000-0000-0000-000000000002","role":"user","text":"from the first build","createdAt":0}]}]}
+        """
+        try Data(fixture.utf8).write(to: directory.appendingPathComponent("conversations-v1.json"))
+
+        let laterBuild = try ConversationRepository(directory: directory)
+        XCTAssertEqual(laterBuild.archive.conversations.first?.messages.first?.text, "from the first build")
+    }
+
     func testExplicitStopNeverNeedsModelQuestion() {
         XCTAssertNotNil(ReflectionPolicy.localStopReply(for: "Stop here."))
         XCTAssertNotNil(ReflectionPolicy.localStopReply(for: "聊到这里。"))
