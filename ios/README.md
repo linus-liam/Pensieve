@@ -35,6 +35,16 @@ The repository's earlier mobile web preview uses separate browser storage. This 
 
 The app's archive format is versioned (`conversations-v1.json`). If a future app cannot decode it, launch shows an error instead of replacing it with an empty archive. Files are atomically written, and iOS data protection is requested after each write. Exported archives contain personal conversations and should be handled accordingly.
 
+## Handoff with the current Personal Team
+
+Liam currently has only an Apple Personal Team. Its development provisioning profile expires seven days after issuance; the installed app must be rebuilt and reinstalled before expiration. The current profile expires on 2026-10-10. Apple documents the [Personal Team limits and renewal requirement](https://developer.apple.com/help/account/basics/about-your-developer-account).
+
+1. At handoff, connect Linus's unlocked iPhone to a Mac running Xcode and enable Developer Mode if prompted. Select that phone as the `PensievePrivate` run destination. In **Signing & Capabilities**, use an available Personal Team and automatic signing. Xcode must register that phone in the profile.
+2. Build and run the app on Linus's phone. Trust the developer profile on the phone if iOS prompts. Open Pensieve from its icon after unplugging the phone, then enter Linus's own API key in app Settings. Do not send the key through chat or commit it.
+3. Start the seven-day use period only after installation and the synthetic launch, AI, relaunch and data checks pass on Linus's phone. Before the profile expires, rebuild and install over the existing app using the same bundle ID; do not delete the app, because deletion removes its local archive.
+
+If Linus needs remote installation or a full week without coordinating a refresh, an enrolled Apple Developer Program team and a distribution path such as TestFlight are needed. [Apple lists TestFlight with the paid program](https://developer.apple.com/programs/). This distribution choice is open; do not assume enrollment or a handoff date.
+
 ## Current limits
 
 - This is a private development build, not an App Store release.
