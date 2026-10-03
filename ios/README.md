@@ -40,7 +40,7 @@ The app's archive format is versioned (`conversations-v1.json`). If a future app
 - This is a private development build, not an App Store release.
 - On 2026-10-03, a synthetic message survived simulator relaunch and installing simulator build 2 over build 1 with the same bundle ID.
 - A signed build installed and launched on Liam's iPhone 13 Pro. Liam confirmed that the exact synthetic message survived force quit and relaunch on that phone, and remained visible after build 2 installed over build 1 with the same bundle ID.
-- Live AI behavior, stopping scenarios, and independent use away from the Mac still need real-device checks.
+- Liam received a live AI reply while the phone was unplugged, confirmed that an offline message stayed saved and retried after reconnection, and saw no new question after an explicit stop. The first AI reply asked too many questions; build 3 refines the prompt and is being checked for the correction and natural stopping cases.
 - The current personal-team provisioning profile expires on 2026-10-10. Refresh signing at handoff or use longer-lived provisioning before Linus starts his one-week use.
 - iPadOS, macOS, cross-device sync and account login are outside this first result.
 - The exact evidence-informed stopping behavior still needs evaluation with synthetic conversations and feedback from real use.
