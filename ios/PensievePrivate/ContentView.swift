@@ -99,6 +99,12 @@ struct ContentView: View {
                     withAnimation { proxy.scrollTo(last, anchor: .bottom) }
                 }
             }
+            .task(id: model.selectedID) {
+                await Task.yield()
+                if let last = model.selectedConversation?.messages.last?.id {
+                    proxy.scrollTo(last, anchor: .bottom)
+                }
+            }
         }
     }
 
