@@ -2,6 +2,15 @@ import Foundation
 import Security
 
 enum PrivateKeyStore {
+#if targetEnvironment(simulator)
+    // Simulator installs made with simctl have no app identifier entitlement.
+    // Keep a test key in memory so it is never written to an unprotected file.
+    private static var simulatorKey: String?
+
+    static func read() -> String? { simulatorKey }
+    static func save(_ key: String) throws { simulatorKey = key }
+    static func delete() { simulatorKey = nil }
+#else
     private static let service = "com.linusliam.pensieve.private-ai"
     private static let account = "openai-api-key"
 
@@ -34,11 +43,12 @@ enum PrivateKeyStore {
         if status == errSecItemNotFound {
             var add = query
             attributes.forEach { add[$0.key] = $0.value }
-            guard SecItemAdd(add as CFDictionary, nil) == errSecSuccess else {
-                throw KeyStoreError.saveFailed
+            let addStatus = SecItemAdd(add as CFDictionary, nil)
+            guard addStatus == errSecSuccess else {
+                throw KeyStoreError.saveFailed(addStatus)
             }
         } else if status != errSecSuccess {
-            throw KeyStoreError.saveFailed
+            throw KeyStoreError.saveFailed(status)
         }
     }
 
@@ -50,9 +60,19 @@ enum PrivateKeyStore {
         ]
         SecItemDelete(query as CFDictionary)
     }
+#endif
 }
 
 enum KeyStoreError: LocalizedError {
-    case saveFailed
-    var errorDescription: String? { "The API key could not be saved on this device." }
+    case saveFailed(OSStatus)
+    var errorDescription: String? {
+        switch self {
+        case .saveFailed(let status):
+#if DEBUG
+            return "The API key could not be saved on this device (Keychain status \(status))."
+#else
+            return "The API key could not be saved on this device."
+#endif
+        }
+    }
 }

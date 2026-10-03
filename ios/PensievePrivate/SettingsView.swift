@@ -18,14 +18,18 @@ struct SettingsView: View {
                     SecureField("OpenAI API key", text: $key)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
-                    Button(hasKey ? "Replace saved key" : "Save key on this iPhone") { saveKey() }
+#if targetEnvironment(simulator)
+                    Text("Simulator test keys stay in app memory and disappear when the app closes.")
+                        .font(.footnote)
+#endif
+                    Button(saveKeyLabel) { saveKey() }
                         .disabled(key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     if hasKey {
-                        Button("Remove saved key", role: .destructive) {
+                        Button(removeKeyLabel, role: .destructive) {
                             PrivateKeyStore.delete()
                             hasKey = false
                             aiEnabled = false
-                            message = "Saved key removed."
+                            message = "Key removed."
                         }
                     }
                     TextField("Model", text: $model)
@@ -50,7 +54,28 @@ struct SettingsView: View {
             .navigationTitle("设置")
             .toolbar { Button("完成") { dismiss() } }
         }
-        .onAppear { hasKey = PrivateKeyStore.read() != nil }
+        .onAppear {
+            hasKey = PrivateKeyStore.read() != nil
+#if targetEnvironment(simulator)
+            if !hasKey { aiEnabled = false }
+#endif
+        }
+    }
+
+    private var saveKeyLabel: String {
+#if targetEnvironment(simulator)
+        return hasKey ? "Replace session key" : "Use key for this simulator session"
+#else
+        return hasKey ? "Replace saved key" : "Save key on this iPhone"
+#endif
+    }
+
+    private var removeKeyLabel: String {
+#if targetEnvironment(simulator)
+        return "Clear session key"
+#else
+        return "Remove saved key"
+#endif
     }
 
     private func saveKey() {
@@ -58,7 +83,11 @@ struct SettingsView: View {
             try PrivateKeyStore.save(key.trimmingCharacters(in: .whitespacesAndNewlines))
             key = ""
             hasKey = true
+#if targetEnvironment(simulator)
+            message = "Key available for this simulator session. Enable AI replies when you are ready."
+#else
             message = "Key saved on this iPhone. Enable AI replies when you are ready."
+#endif
         } catch {
             message = error.localizedDescription
         }

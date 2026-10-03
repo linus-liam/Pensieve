@@ -8,7 +8,7 @@ This is the first native iPhone development build for Linus and Liam. It uses on
 2. Select the `PensievePrivate` scheme and an iPhone simulator or connected iPhone.
 3. For a physical iPhone, set a development team in **Signing & Capabilities**. The default bundle identifier is `com.linusliam.pensieve.private`; keep whichever identifier you first install on that phone unchanged across later builds so iOS keeps its data container.
 4. Run the app. It opens without registration or login. It saves raw messages even when AI is off.
-5. On the device, open **Settings**, enter an OpenAI API key and enable AI replies. The current conversation is sent directly from this iPhone to OpenAI when generating a reply. Other conversations are not sent automatically. No key is bundled into the app.
+5. On the device, open **Settings**, enter an OpenAI API key and enable AI replies. The current conversation is sent directly from this iPhone to OpenAI when generating a reply. Other conversations are not sent automatically. No key is bundled into the app. On a simulator, a test key stays in memory for the current app session only; it must be entered again after relaunch. On a physical iPhone, the key is stored in that device's Keychain.
 
 The app uses `gpt-4o-mini` by default; the model can be changed in Settings. Network access is required for AI replies. An explicit whole-message stop request is acknowledged locally without another model question. The app never automatically closes a conversation.
 
