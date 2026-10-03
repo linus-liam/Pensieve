@@ -98,6 +98,14 @@ When asked what completes the first iOS cycle, Linus selected the option requiri
 
 Liam agreed to convert the current implementation to iOS, said local storage was straightforward, accepted that the first build is only for the two founders, and distinguished it from a public release that will require stronger security.
 
+## Engineering progress — 2026-10-03
+
+An initial native SwiftUI project is now in [`../ios/`](../ios/README.md). It implements one chat surface, history, local raw-message storage before AI requests, a device-Keychain API key, direct AI replies, a local response to unambiguous stop requests, retry after AI failure, and archive export. The archive uses a stable bundle ID and versioned local format; a decoding failure stops writes rather than silently resetting conversations.
+
+The core tests cover save/reopen, unreadable and future-format archives, request shape, mocked success/failure responses, and explicit stopping. Simulator and device builds compile without code signing. **This is engineering progress, not the agreed handoff:** a simulator runtime is not installed on the current Mac, the registered iPhone was unavailable during verification, and no signed install, live AI conversation, real-device relaunch or later-build upgrade check has passed yet. The exact stopping behavior still needs synthetic and real-use evaluation. Keep the current cycle in engineering until the acceptance checks above pass.
+
+The earlier mobile web preview has separate browser storage and is not automatically migrated into this native app.
+
 ## Related context
 
 - [Existing iPhone web preview](mobile-preview.md)

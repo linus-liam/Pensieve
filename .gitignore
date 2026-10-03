@@ -54,3 +54,8 @@ skills-lock.json
 
 # Private local memories (never commit)
 .pensieve/
+
+# Xcode / SwiftPM local state
+ios/Core/.build/
+ios/**/xcuserdata/
+*.xcuserstate
