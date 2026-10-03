@@ -38,6 +38,7 @@ The app's archive format is versioned (`conversations-v1.json`). If a future app
 ## Current limits
 
 - This is a private development build, not an App Store release.
+- On 2026-10-03, a synthetic message survived simulator relaunch and installing simulator build 2 over build 1 with the same bundle ID. This does not replace a real-device check.
 - Physical-device signing, installation, live AI behavior and upgrade continuity require device checks; a simulator build alone does not prove them.
 - iPadOS, macOS, cross-device sync and account login are outside this first result.
 - The exact evidence-informed stopping behavior still needs evaluation with synthetic conversations and feedback from real use.
