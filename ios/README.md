@@ -6,7 +6,7 @@ This is the first native iPhone development build for Linus and Liam. It uses on
 
 1. Open `ios/PensievePrivate.xcodeproj` in Xcode 26.5 or newer.
 2. Select the `PensievePrivate` scheme and an iPhone simulator or connected iPhone.
-3. For a physical iPhone, set a development team in **Signing & Capabilities**. Keep the bundle identifier `com.linusliam.pensieve.private` unchanged across later builds so iOS keeps this app's data container.
+3. For a physical iPhone, set a development team in **Signing & Capabilities**. The default bundle identifier is `com.linusliam.pensieve.private`; keep whichever identifier you first install on that phone unchanged across later builds so iOS keeps its data container.
 4. Run the app. It opens without registration or login. It saves raw messages even when AI is off.
 5. On the device, open **Settings**, enter an OpenAI API key and enable AI replies. The current conversation is sent directly from this iPhone to OpenAI when generating a reply. Other conversations are not sent automatically. No key is bundled into the app.
 
@@ -37,11 +37,16 @@ The app's archive format is versioned (`conversations-v1.json`). If a future app
 
 ## Handoff with the current Personal Team
 
-Liam currently has only an Apple Personal Team. Its development provisioning profile expires seven days after issuance; the installed app must be rebuilt and reinstalled before expiration. The current profile expires on 2026-10-10. Apple documents the [Personal Team limits and renewal requirement](https://developer.apple.com/help/account/basics/about-your-developer-account).
+Liam currently has only an Apple Personal Team. Its development provisioning profile expires seven days after issuance; the installed app must be rebuilt and reinstalled before expiration. The current profile on Liam's phone expires on 2026-10-10. Apple documents the [Personal Team limits and renewal requirement](https://developer.apple.com/help/account/basics/about-your-developer-account).
 
-1. At handoff, connect Linus's unlocked iPhone to a Mac running Xcode and enable Developer Mode if prompted. Select that phone as the `PensievePrivate` run destination. In **Signing & Capabilities**, use an available Personal Team and automatic signing. Xcode must register that phone in the profile.
-2. Build and run the app on Linus's phone. Trust the developer profile on the phone if iOS prompts. Open Pensieve from its icon after unplugging the phone, then enter Linus's own API key in app Settings. Do not send the key through chat or commit it.
-3. Start the seven-day use period only after installation and the synthetic launch, AI, relaunch and data checks pass on Linus's phone. Before the profile expires, rebuild and install over the existing app using the same bundle ID; do not delete the app, because deletion removes its local archive.
+If Linus is remote and has a Mac with Xcode, he can perform the initial install himself:
+
+1. Clone this branch with `git clone --branch codex/ios-private-build https://github.com/linus-liam/Pensieve.git`, then open `ios/PensievePrivate.xcodeproj` in Xcode. Sign in to his own Apple Account in **Xcode > Settings > Accounts**.
+2. Connect and unlock his iPhone, select it as the run destination, and choose his Personal Team under **Signing & Capabilities** with automatic signing. If Xcode says the default bundle identifier is unavailable for his team, choose a unique one once and retain it for every later build on that phone.
+3. Build and run. Enable Developer Mode or trust the developer profile if prompted. Unplug the phone, open Pensieve from its icon, and complete the synthetic launch, AI, relaunch and data checks in the checklist above. Enter his own API key in app Settings; do not send it through chat or commit it.
+4. Note the new provisioning profile's expiration date. Rebuild and install over the existing app before it expires; do not delete the app, because deletion removes its local archive.
+
+If Linus's phone is physically available to Liam instead, Liam can select that phone as the Xcode run destination and sign it with his Personal Team. In either case, start the one-week use period only after Linus's own phone passes the checks.
 
 If Linus needs remote installation or a full week without coordinating a refresh, an enrolled Apple Developer Program team and a distribution path such as TestFlight are needed. [Apple lists TestFlight with the paid program](https://developer.apple.com/programs/). This distribution choice is open; do not assume enrollment or a handoff date.
 
