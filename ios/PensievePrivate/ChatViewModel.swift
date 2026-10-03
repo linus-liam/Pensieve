@@ -91,6 +91,7 @@ final class ChatViewModel: ObservableObject {
                 )
                 try repository?.appendAssistant(reply, to: id)
                 refresh()
+                errorMessage = nil
             } catch {
                 errorMessage = "Your message is saved. \(error.localizedDescription)"
             }
