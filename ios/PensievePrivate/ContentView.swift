@@ -170,10 +170,25 @@ struct ContentView: View {
                 .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || model.isGenerating)
             }
 
-            Text("原文先保存到设备")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .padding(.leading, 12)
+            HStack {
+                Text("原文先保存到设备")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .padding(.leading, 12)
+                Spacer()
+                if model.canPause {
+                    Button {
+                        if model.pauseConversation() {
+                            composerFocused = false
+                        }
+                    } label: {
+                        Label("暂停", systemImage: "pause.fill")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .disabled(hasUnsentDraft)
+                }
+            }
         }
         .padding(.horizontal, 12)
         .padding(.top, 8)

@@ -79,6 +79,25 @@ final class ConversationRepositoryTests: XCTestCase {
         XCTAssertNotNil(repository.conversation(keptID))
     }
 
+    func testPauseButtonRecordsIntentAndLocalReplyAtomically() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let repository = try ConversationRepository(directory: directory)
+        let id = try repository.appendUser("I need to think about this")
+
+        try repository.pauseConversation(id)
+
+        let relaunched = try ConversationRepository(directory: directory)
+        XCTAssertEqual(
+            relaunched.conversation(id)?.messages.suffix(2).map(\.text),
+            [ReflectionPolicy.pauseUserText, ReflectionPolicy.pauseReply]
+        )
+        XCTAssertEqual(
+            relaunched.conversation(id)?.messages.suffix(2).map(\.role),
+            [.user, .assistant]
+        )
+    }
+
     func testExplicitStopNeverNeedsModelQuestion() {
         XCTAssertNotNil(ReflectionPolicy.localStopReply(for: "Stop here."))
         XCTAssertNotNil(ReflectionPolicy.localStopReply(for: "聊到这里。"))
@@ -99,6 +118,8 @@ final class ConversationRepositoryTests: XCTestCase {
         XCTAssertTrue(ReflectionPolicy.instructions.contains("If the user asks to stop"))
         XCTAssertTrue(ReflectionPolicy.instructions.contains("wants to continue"))
         XCTAssertTrue(ReflectionPolicy.instructions.contains("When further questions no longer add clarity"))
+        XCTAssertTrue(ReflectionPolicy.instructions.contains("pause button"))
+        XCTAssertTrue(ReflectionPolicy.instructions.contains("never ask whether they want to pause"))
         XCTAssertTrue(ReflectionPolicy.instructions.contains("The user decides"))
     }
 }
