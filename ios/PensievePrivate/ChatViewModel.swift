@@ -83,6 +83,23 @@ final class ChatViewModel: ObservableObject {
         generateReply(to: conversation.id, key: key)
     }
 
+    @discardableResult
+    func deleteConversation(_ id: UUID) -> Bool {
+        guard !isGenerating, let repository else { return false }
+        do {
+            try repository.deleteConversation(id)
+            refresh()
+            if selectedID == id {
+                selectedID = conversations.first?.id
+            }
+            errorMessage = nil
+            return true
+        } catch {
+            errorMessage = "Could not delete this conversation: \(error.localizedDescription)"
+            return false
+        }
+    }
+
     private func generateReply(to id: UUID, key: String) {
         guard let conversation = repository?.conversation(id) else { return }
         isGenerating = true

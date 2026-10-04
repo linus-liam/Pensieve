@@ -53,6 +53,32 @@ final class ConversationRepositoryTests: XCTestCase {
         XCTAssertEqual(laterBuild.archive.conversations.first?.messages.first?.text, "from the first build")
     }
 
+    func testDeletedConversationStaysDeletedAfterRelaunch() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let repository = try ConversationRepository(directory: directory)
+        let deletedID = try repository.appendUser("Delete this conversation")
+        let keptID = try repository.appendUser("Keep this conversation")
+
+        try repository.deleteConversation(deletedID)
+
+        let relaunched = try ConversationRepository(directory: directory)
+        XCTAssertNil(relaunched.conversation(deletedID))
+        XCTAssertEqual(relaunched.conversation(keptID)?.messages.map(\.text), ["Keep this conversation"])
+    }
+
+    func testDeletingMissingConversationDoesNotChangeArchive() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let repository = try ConversationRepository(directory: directory)
+        let keptID = try repository.appendUser("Keep this conversation")
+        let before = try Data(contentsOf: repository.fileURL)
+
+        XCTAssertThrowsError(try repository.deleteConversation(UUID()))
+        XCTAssertEqual(try Data(contentsOf: repository.fileURL), before)
+        XCTAssertNotNil(repository.conversation(keptID))
+    }
+
     func testExplicitStopNeverNeedsModelQuestion() {
         XCTAssertNotNil(ReflectionPolicy.localStopReply(for: "Stop here."))
         XCTAssertNotNil(ReflectionPolicy.localStopReply(for: "聊到这里。"))
