@@ -99,8 +99,8 @@ final class ConversationRepositoryTests: XCTestCase {
     }
 
     func testExplicitStopNeverNeedsModelQuestion() {
-        XCTAssertNotNil(ReflectionPolicy.localStopReply(for: "Stop here."))
-        XCTAssertNotNil(ReflectionPolicy.localStopReply(for: "聊到这里。"))
+        XCTAssertTrue(ReflectionPolicy.localStopReply(for: "Stop here.")?.contains("saved what you shared") == true)
+        XCTAssertTrue(ReflectionPolicy.localStopReply(for: "聊到这里。")?.contains("已经把刚才的内容记下了") == true)
         XCTAssertNil(ReflectionPolicy.localStopReply(for: "I corrected that; I want to continue"))
         XCTAssertNil(ReflectionPolicy.localStopReply(for: "I don't know what to ask next"))
     }
@@ -120,6 +120,8 @@ final class ConversationRepositoryTests: XCTestCase {
         XCTAssertTrue(ReflectionPolicy.instructions.contains("When further questions no longer add clarity"))
         XCTAssertTrue(ReflectionPolicy.instructions.contains("pause button"))
         XCTAssertTrue(ReflectionPolicy.instructions.contains("never ask whether they want to pause"))
+        XCTAssertTrue(ReflectionPolicy.instructions.contains("saved what the user shared"))
+        XCTAssertTrue(ReflectionPolicy.instructions.contains("automatically remind them"))
         XCTAssertTrue(ReflectionPolicy.instructions.contains("The user decides"))
     }
 }
