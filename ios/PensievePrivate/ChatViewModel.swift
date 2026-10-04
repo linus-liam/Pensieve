@@ -43,6 +43,11 @@ final class ChatViewModel: ObservableObject {
             PrivateKeyStore.read() != nil
     }
 
+    var canPause: Bool {
+        guard let conversation = selectedConversation, !isGenerating else { return false }
+        return !conversation.messages.isEmpty && conversation.messages.last?.text != ReflectionPolicy.pauseReply
+    }
+
     func select(_ id: UUID?) { selectedID = id; errorMessage = nil }
 
     @discardableResult
@@ -81,6 +86,37 @@ final class ChatViewModel: ObservableObject {
               let conversation = selectedConversation,
               let key = PrivateKeyStore.read() else { return }
         generateReply(to: conversation.id, key: key)
+    }
+
+    @discardableResult
+    func deleteConversation(_ id: UUID) -> Bool {
+        guard !isGenerating, let repository else { return false }
+        do {
+            try repository.deleteConversation(id)
+            refresh()
+            if selectedID == id {
+                selectedID = conversations.first?.id
+            }
+            errorMessage = nil
+            return true
+        } catch {
+            errorMessage = "Could not delete this conversation: \(error.localizedDescription)"
+            return false
+        }
+    }
+
+    @discardableResult
+    func pauseConversation() -> Bool {
+        guard canPause, let id = selectedID, let repository else { return false }
+        do {
+            try repository.pauseConversation(id)
+            refresh()
+            errorMessage = nil
+            return true
+        } catch {
+            errorMessage = "Could not pause this conversation: \(error.localizedDescription)"
+            return false
+        }
     }
 
     private func generateReply(to id: UUID, key: String) {

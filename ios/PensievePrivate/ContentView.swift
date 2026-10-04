@@ -5,6 +5,7 @@ struct ContentView: View {
     @State private var draft = ""
     @State private var showingHistory = false
     @State private var showingSettings = false
+    @State private var pendingDeletion: Conversation?
     @FocusState private var composerFocused: Bool
 
     private var hasUnsentDraft: Bool {
@@ -169,10 +170,25 @@ struct ContentView: View {
                 .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || model.isGenerating)
             }
 
-            Text("原文先保存到设备")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .padding(.leading, 12)
+            HStack {
+                Text("原文先保存到设备")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .padding(.leading, 12)
+                Spacer()
+                if model.canPause {
+                    Button {
+                        if model.pauseConversation() {
+                            composerFocused = false
+                        }
+                    } label: {
+                        Label("暂停", systemImage: "pause.fill")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .disabled(hasUnsentDraft)
+                }
+            }
         }
         .padding(.horizontal, 12)
         .padding(.top, 8)
@@ -200,9 +216,35 @@ struct ContentView: View {
                         }
                     }
                 }
+                .onDelete { offsets in
+                    guard let index = offsets.first else { return }
+                    pendingDeletion = model.conversations[index]
+                }
             }
             .navigationTitle("过去的聊天")
-            .toolbar { Button("完成") { showingHistory = false } }
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) { EditButton() }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("完成") { showingHistory = false }
+                }
+            }
+            .alert(
+                "删除这段聊天？",
+                isPresented: Binding(
+                    get: { pendingDeletion != nil },
+                    set: { if !$0 { pendingDeletion = nil } }
+                ),
+                presenting: pendingDeletion
+            ) { conversation in
+                Button("删除", role: .destructive) {
+                    if model.deleteConversation(conversation.id) {
+                        pendingDeletion = nil
+                    }
+                }
+                Button("取消", role: .cancel) { pendingDeletion = nil }
+            } message: { conversation in
+                Text("“\(conversation.title)”会从这台 iPhone 永久删除。")
+            }
         }
     }
 

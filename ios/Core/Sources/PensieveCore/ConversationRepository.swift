@@ -71,6 +71,30 @@ public final class ConversationRepository {
         return archive.conversations.first(where: { $0.id == id })
     }
 
+    public func deleteConversation(_ id: UUID) throws {
+        var next = archive
+        guard let index = next.conversations.firstIndex(where: { $0.id == id }) else {
+            throw ConversationStoreError.conversationMissing
+        }
+        next.conversations.remove(at: index)
+        try commit(next)
+    }
+
+    public func pauseConversation(_ id: UUID, at date: Date = Date()) throws {
+        var next = archive
+        guard let index = next.conversations.firstIndex(where: { $0.id == id }) else {
+            throw ConversationStoreError.conversationMissing
+        }
+        next.conversations[index].messages.append(
+            .init(role: .user, text: ReflectionPolicy.pauseUserText, createdAt: date)
+        )
+        next.conversations[index].messages.append(
+            .init(role: .assistant, text: ReflectionPolicy.pauseReply, createdAt: date)
+        )
+        next.conversations[index].updatedAt = date
+        try commit(next)
+    }
+
     private func commit(_ candidate: ConversationArchive) throws {
         let data = try JSONEncoder().encode(candidate)
         try data.write(to: fileURL, options: .atomic)

@@ -53,9 +53,54 @@ final class ConversationRepositoryTests: XCTestCase {
         XCTAssertEqual(laterBuild.archive.conversations.first?.messages.first?.text, "from the first build")
     }
 
+    func testDeletedConversationStaysDeletedAfterRelaunch() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let repository = try ConversationRepository(directory: directory)
+        let deletedID = try repository.appendUser("Delete this conversation")
+        let keptID = try repository.appendUser("Keep this conversation")
+
+        try repository.deleteConversation(deletedID)
+
+        let relaunched = try ConversationRepository(directory: directory)
+        XCTAssertNil(relaunched.conversation(deletedID))
+        XCTAssertEqual(relaunched.conversation(keptID)?.messages.map(\.text), ["Keep this conversation"])
+    }
+
+    func testDeletingMissingConversationDoesNotChangeArchive() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let repository = try ConversationRepository(directory: directory)
+        let keptID = try repository.appendUser("Keep this conversation")
+        let before = try Data(contentsOf: repository.fileURL)
+
+        XCTAssertThrowsError(try repository.deleteConversation(UUID()))
+        XCTAssertEqual(try Data(contentsOf: repository.fileURL), before)
+        XCTAssertNotNil(repository.conversation(keptID))
+    }
+
+    func testPauseButtonRecordsIntentAndLocalReplyAtomically() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let repository = try ConversationRepository(directory: directory)
+        let id = try repository.appendUser("I need to think about this")
+
+        try repository.pauseConversation(id)
+
+        let relaunched = try ConversationRepository(directory: directory)
+        XCTAssertEqual(
+            relaunched.conversation(id)?.messages.suffix(2).map(\.text),
+            [ReflectionPolicy.pauseUserText, ReflectionPolicy.pauseReply]
+        )
+        XCTAssertEqual(
+            relaunched.conversation(id)?.messages.suffix(2).map(\.role),
+            [.user, .assistant]
+        )
+    }
+
     func testExplicitStopNeverNeedsModelQuestion() {
-        XCTAssertNotNil(ReflectionPolicy.localStopReply(for: "Stop here."))
-        XCTAssertNotNil(ReflectionPolicy.localStopReply(for: "聊到这里。"))
+        XCTAssertTrue(ReflectionPolicy.localStopReply(for: "Stop here.")?.contains("saved what you shared") == true)
+        XCTAssertTrue(ReflectionPolicy.localStopReply(for: "聊到这里。")?.contains("已经把刚才的内容记下了") == true)
         XCTAssertNil(ReflectionPolicy.localStopReply(for: "I corrected that; I want to continue"))
         XCTAssertNil(ReflectionPolicy.localStopReply(for: "I don't know what to ask next"))
     }
@@ -73,6 +118,10 @@ final class ConversationRepositoryTests: XCTestCase {
         XCTAssertTrue(ReflectionPolicy.instructions.contains("If the user asks to stop"))
         XCTAssertTrue(ReflectionPolicy.instructions.contains("wants to continue"))
         XCTAssertTrue(ReflectionPolicy.instructions.contains("When further questions no longer add clarity"))
+        XCTAssertTrue(ReflectionPolicy.instructions.contains("pause button"))
+        XCTAssertTrue(ReflectionPolicy.instructions.contains("never ask whether they want to pause"))
+        XCTAssertTrue(ReflectionPolicy.instructions.contains("saved what the user shared"))
+        XCTAssertTrue(ReflectionPolicy.instructions.contains("automatically remind them"))
         XCTAssertTrue(ReflectionPolicy.instructions.contains("The user decides"))
     }
 }
