@@ -98,6 +98,14 @@ When asked what completes the first iOS cycle, Linus selected the option requiri
 
 Liam agreed to convert the current implementation to iOS, said local storage was straightforward, accepted that the first build is only for the two founders, and distinguished it from a public release that will require stronger security.
 
+## Engineering progress — 2026-10-03
+
+An initial native SwiftUI project is now in [`../ios/`](../ios/README.md). It implements one chat surface, history, local raw-message storage before AI requests, a device-Keychain API key, direct AI replies, a local response to unambiguous stop requests, retry after AI failure, and archive export. The archive uses a stable bundle ID and versioned local format; a decoding failure stops writes rather than silently resetting conversations.
+
+The core tests cover save/reopen, unreadable and future-format archives, request shape, mocked success/failure responses, and explicit stopping. On 2026-10-03 the native app launched in an iPhone 17 Pro simulator; a synthetic user message survived force quit and relaunch, then remained visible after installing build 2 over build 1 with the same bundle ID. A signed development build also installed and launched on Liam's iPhone 13 Pro after he trusted the developer profile. Liam confirmed that a synthetic conversation survived force quit and relaunch on that phone, and its earlier message remained visible after build 2 was installed over build 1. While unplugged from the Mac, he received a live AI reply, verified that an offline message remained saved and retried successfully after reconnecting, and confirmed that an explicit stop received no further question. Simulator live-AI checks then covered one-question follow-up, correction and continuation, no question after a clear stopping point, resuming when the user chose to continue, explicit stop, and complete-conversation persistence after relaunch. The simulator uses a session-only in-memory test key because unsigned simulator installs lack the Keychain entitlement; the physical iPhone continues to use Keychain. The model still sometimes infers an unstated explanation despite the tightened prompt, so reply grounding needs observation during real use. **This is engineering progress, not the agreed handoff:** Linus's installation and one-week use remain. Liam has only a Personal Team; its current provisioning profile expires on 2026-10-10, so Linus's one-week use needs a fresh signed install at handoff or longer-lived provisioning.
+
+The earlier mobile web preview has separate browser storage and is not automatically migrated into this native app.
+
 ## Related context
 
 - [Existing iPhone web preview](mobile-preview.md)

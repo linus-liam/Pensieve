@@ -4,7 +4,11 @@ Pensieve is a Vite/React memory capture app with an Express/Postgres API. The
 backend stores raw memory entries, asks OpenAI for a one-sentence summary, and
 serves the timeline/detail flow.
 
-## iPhone 个人试用
+## iPhone 原生私用开发版
+
+原生 iOS 工程位于 [`ios/PensievePrivate.xcodeproj`](ios/PensievePrivate.xcodeproj)，构建、签名、设备验收步骤见 [`ios/README.md`](ios/README.md)。它在设备本地保存完整原始聊天；AI 密钥由使用者在手机设置中输入。真机安装、真实 AI 对话和后续版本保留数据仍需按说明验收。
+
+## 之前的 iPhone Web Preview
 
 > 当前下一步（2026-10-01）：先交付供 Linus 与 Liam 私用的 iOS 版本；不要求同步或登录，沿用当前流程与界面，在设备本地保留完整原始对话，并保证后续开发版本能够继续读取已有数据。范围与验收见 [`docs/ios-first-private-build.md`](docs/ios-first-private-build.md)。下方地址是此前已经部署的 Web Preview。
 
