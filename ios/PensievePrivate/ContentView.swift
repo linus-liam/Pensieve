@@ -13,7 +13,7 @@ struct ContentView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
+            Group {
                 if let loadError = model.loadError {
                     ContentUnavailableView(
                         "Conversations unavailable",
@@ -22,7 +22,9 @@ struct ContentView: View {
                     )
                 } else {
                     conversationBody
-                    composer
+                        .safeAreaInset(edge: .bottom, spacing: 0) {
+                            composer
+                        }
                 }
             }
             .background(Color(uiColor: .systemGroupedBackground))
@@ -83,7 +85,10 @@ struct ContentView: View {
                         .font(.footnote)
                         .padding(12)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(.white, in: RoundedRectangle(cornerRadius: 14))
+                        .background(
+                            Color(uiColor: .secondarySystemGroupedBackground),
+                            in: RoundedRectangle(cornerRadius: 14)
+                        )
                     }
                     if model.selectedConversation?.messages.last?.role == .user {
                         Button("生成 / 重试 AI 回复") { model.retryLastReply() }
@@ -94,6 +99,7 @@ struct ContentView: View {
                 .padding(.bottom, 20)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .scrollDismissesKeyboard(.interactively)
             .onChange(of: model.selectedConversation?.messages.count) { _, _ in
                 if let last = model.selectedConversation?.messages.last?.id {
                     withAnimation { proxy.scrollTo(last, anchor: .bottom) }
@@ -134,26 +140,24 @@ struct ContentView: View {
     }
 
     private var composer: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            TextEditor(text: $draft)
-                .focused($composerFocused)
-                .frame(minHeight: 76, maxHeight: 130)
-                .scrollContentBackground(.hidden)
-                .accessibilityLabel("此刻想说的话")
-                .overlay(alignment: .topLeading) {
-                    if draft.isEmpty {
-                        Text("此刻想说的话…")
-                            .foregroundStyle(.tertiary)
-                            .padding(.top, 8)
-                            .padding(.leading, 5)
-                            .allowsHitTesting(false)
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(alignment: .bottom, spacing: 8) {
+                TextField("此刻想说的话…", text: $draft, axis: .vertical)
+                    .lineLimit(1...4)
+                    .textFieldStyle(.plain)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .background(
+                        Color(uiColor: .secondarySystemGroupedBackground),
+                        in: RoundedRectangle(cornerRadius: 18)
+                    )
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 18)
+                            .stroke(Color(uiColor: .separator), lineWidth: 0.5)
                     }
-                }
-            HStack {
-                Text("原文先保存到设备")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Spacer()
+                    .focused($composerFocused)
+                    .accessibilityLabel("此刻想说的话")
+
                 Button("发送") {
                     if model.send(draft) {
                         draft = ""
@@ -161,14 +165,19 @@ struct ContentView: View {
                     }
                 }
                 .buttonStyle(.borderedProminent)
+                .controlSize(.regular)
                 .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || model.isGenerating)
             }
+
+            Text("原文先保存到设备")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .padding(.leading, 12)
         }
-        .padding(14)
-        .background(.white, in: RoundedRectangle(cornerRadius: 22))
-        .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color(uiColor: .separator)))
-        .padding(.horizontal, 14)
-        .padding(.bottom, 10)
+        .padding(.horizontal, 12)
+        .padding(.top, 8)
+        .padding(.bottom, 6)
+        .background(.bar)
     }
 
     private var historySheet: some View {
