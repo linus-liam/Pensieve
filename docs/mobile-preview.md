@@ -6,7 +6,7 @@
 
 ## 使用与当前状态
 
-地址：https://pensieve-phone.vercel.app 。Vercel 项目为 `ziyue-lins-projects/pensieve-phone`，与已有网站独立。2026-10-09 的 Pensieve Lab 生产部署为 `dpl_5pQmmirQQ4gtgiVzbUEFcnGinuUo`；Vercel 状态为 `Ready`，并已绑定到该固定地址。
+地址：https://pensieve-phone.vercel.app 。Vercel 项目为 `ziyue-lins-projects/pensieve-phone`，与已有网站独立。2026-10-09 的当前 Pensieve Lab 生产部署为 `dpl_7ZvXeGDuEeiFhN6jfTApbSkQREs6`；Vercel 状态为 `Ready`，并已绑定到该固定地址。
 
 该地址现作为 Linus 的快速产品试验入口。当前构建会在页面和设置中显示短版源码修订；新 Service Worker 安装后，用户选择“刷新到新版”才更换已打开的前端，避免在输入中自动刷新。详见 [`pensieve-lab.md`](pensieve-lab.md)。
 
