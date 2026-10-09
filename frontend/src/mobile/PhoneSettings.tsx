@@ -3,6 +3,7 @@ import { Alert, Button, Divider, FileButton, Group, PasswordInput, Stack, Text, 
 import { download, mobileRemote } from "./api";
 import { restoreBackup, snapshot } from "./store";
 import type { LocalInfo } from "../sessionTypes";
+import { checkForLabUpdate, labBuiltAt, labVersion } from "./lab";
 
 export function PhoneSettings({ info, onConnected }: { info: LocalInfo | null; onConnected: () => Promise<void> }) {
   const [code, setCode] = useState("");
@@ -45,6 +46,14 @@ export function PhoneSettings({ info, onConnected }: { info: LocalInfo | null; o
     <Title order={3} size="h4">添加到 iPhone 主屏幕</Title>
     <Text size="sm">在 Safari 的共享菜单中选择“添加到主屏幕”，再从桌面图标打开。离线准备完成后，无网络也能记录和查看；AI 回复需要网络。</Text>
     <Text size="sm" c="dimmed">{offlineReady ? "离线准备已完成。" : "离线准备尚未完成。请保持联网；若一直未完成，请使用 Safari 打开。"}</Text>
+    <Divider />
+    <Title order={3} size="h4">Pensieve Lab</Title>
+    <Text size="sm">当前版本 <Text component="span" ff="monospace">{labVersion}</Text></Text>
+    {labBuiltAt && <Text size="xs" c="dimmed">构建时间 {new Date(labBuiltAt).toLocaleString("zh-CN")}</Text>}
+    <Button variant="default" loading={busy} onClick={() => void run(async () => {
+      const checked = await checkForLabUpdate();
+      setNotice(checked ? "已检查新版；如果发现更新，页面会提示你安全刷新。" : "当前环境不支持自动检查，请重新打开主屏幕 App。");
+    })}>检查新版</Button>
     {error && <Alert color="red" role="alert">{error}</Alert>}
     {notice && <Alert color="blue" role="status">{notice}</Alert>}
   </Stack>;

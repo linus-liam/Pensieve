@@ -5,9 +5,10 @@ import { App } from "./App";
 import { AuthProvider } from "./auth/AuthProvider";
 import "./styles.css";
 import { mobileMode } from "./local";
+import { registerLabServiceWorker } from "./mobile/lab";
 
 if (mobileMode && import.meta.env.PROD && "serviceWorker" in navigator) {
-  void navigator.serviceWorker.register("/sw.js").catch(() => {});
+  void registerLabServiceWorker().catch(() => {});
 }
 
 createRoot(document.getElementById("root")!).render(

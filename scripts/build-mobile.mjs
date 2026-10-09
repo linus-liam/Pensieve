@@ -1,13 +1,19 @@
-import { spawnSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { readFile, writeFile, readdir, mkdir } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { deflateSync } from 'node:zlib';
 import { resolve } from 'node:path';
 
 const root = resolve(import.meta.dirname, '..');
+function gitVersion() {
+  try { return execFileSync('git', ['rev-parse', '--short=8', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(); }
+  catch { return 'local'; }
+}
+const labVersion = (process.env.VERCEL_GIT_COMMIT_SHA || gitVersion()).slice(0, 8);
+const labBuiltAt = new Date().toISOString();
 const built = spawnSync(process.execPath, [resolve(root, 'node_modules/vite/bin/vite.js'), 'build'], {
   cwd: resolve(root, 'frontend'), stdio: 'inherit',
-  env: { ...process.env, VITE_MOBILE_MODE: 'true', VITE_LOCAL_MODE: 'false', VITE_LOCAL_TOKEN: '', VITE_API_BASE_URL: '/api' },
+  env: { ...process.env, VITE_MOBILE_MODE: 'true', VITE_LOCAL_MODE: 'false', VITE_LOCAL_TOKEN: '', VITE_API_BASE_URL: '/api', VITE_LAB_VERSION: labVersion, VITE_LAB_BUILT_AT: labBuiltAt },
 });
 if (built.status !== 0) process.exit(built.status ?? 1);
 const output = resolve(root, 'frontend/dist');
@@ -28,17 +34,18 @@ function icon(size) {
   return Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]), chunk('IHDR', header), chunk('IDAT', deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]);
 }
 for (const size of [180, 192, 512]) await writeFile(resolve(output, `icon-${size}.png`), icon(size));
-await writeFile(resolve(output, 'manifest.webmanifest'), JSON.stringify({ id: '/', name: 'Pensieve', short_name: 'Pensieve', lang: 'zh-CN', start_url: '/', scope: '/', display: 'standalone', background_color: '#fafbfc', theme_color: '#25394f', icons: [192, 512].map(size => ({ src: `/icon-${size}.png`, sizes: `${size}x${size}`, type: 'image/png', purpose: 'any' })) }));
+await writeFile(resolve(output, 'manifest.webmanifest'), JSON.stringify({ id: '/', name: 'Pensieve Lab', short_name: 'Pensieve Lab', lang: 'zh-CN', start_url: '/', scope: '/', display: 'standalone', background_color: '#fafbfc', theme_color: '#25394f', icons: [192, 512].map(size => ({ src: `/icon-${size}.png`, sizes: `${size}x${size}`, type: 'image/png', purpose: 'any' })) }));
+await writeFile(resolve(output, 'build-info.json'), JSON.stringify({ channel: 'lab', version: labVersion, builtAt: labBuiltAt }));
 const index = resolve(output, 'index.html');
 let html = await readFile(index, 'utf8');
-html = html.replace('</head>', '<link rel="manifest" href="/manifest.webmanifest"><link rel="apple-touch-icon" href="/icon-180.png"><meta name="theme-color" content="#25394f"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Pensieve"></head>');
+html = html.replace('</head>', '<link rel="manifest" href="/manifest.webmanifest"><link rel="apple-touch-icon" href="/icon-180.png"><meta name="theme-color" content="#25394f"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Pensieve Lab"></head>');
 html = html.replace('width=device-width, initial-scale=1.0', 'width=device-width, initial-scale=1.0, viewport-fit=cover');
 await writeFile(index, html);
 const assets = ['/', '/index.html', '/manifest.webmanifest', '/icon-180.png', '/icon-192.png', '/icon-512.png', ...(await readdir(resolve(output, 'assets'))).map(file => `/assets/${file}`)];
 const version = createHash('sha256').update(html + assets.join('\n')).digest('hex').slice(0, 16);
 await writeFile(resolve(output, 'sw.js'), `const CACHE = 'pensieve-phone-${version}';
 const ASSETS = ${JSON.stringify(assets)};
-self.addEventListener('install', event => event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS))));
+self.addEventListener('install', event => event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)).then(() => self.skipWaiting())));
 self.addEventListener('activate', event => event.waitUntil(Promise.all([caches.keys().then(keys => Promise.all(keys.filter(key => key.startsWith('pensieve-phone-') && key !== CACHE).map(key => caches.delete(key)))), self.clients.claim()])));
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);

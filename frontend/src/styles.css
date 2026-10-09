@@ -30,6 +30,12 @@ body {
   display: none;
 }
 
+.lab-bar {
+  border-bottom: 1px solid var(--mantine-color-gray-2);
+  min-height: 28px;
+  padding: 0 4px 8px;
+}
+
 .capture-composer__footer,
 .memory-detail__actions {
   align-items: center;

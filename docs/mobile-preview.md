@@ -1,4 +1,4 @@
-# iPhone 个人试用 · 2026-09-13
+# Pensieve Lab · iPhone 内部试用
 
 > 2026-10-01 更新：Linus 与 Liam 已决定先交付 iOS 私用开发版，不要求跨设备同步、登录或公开发布，并以本机保留完整原始对话及后续版本继续读取已有数据为第一阶段验收。当前实现任务见 [`ios-first-private-build.md`](ios-first-private-build.md)。下文保留此前 Web Preview 的实际实现与验证状态，不再代表当前交付优先级。
 
@@ -7,6 +7,8 @@
 ## 使用与当前状态
 
 地址：https://pensieve-phone.vercel.app 。Vercel 项目为 `ziyue-lins-projects/pensieve-phone`，与已有网站独立。生产部署 `dpl_66LyAy8yrc7pStQJwC4kapofr9hj` 已就绪。
+
+该地址现作为 Linus 的快速产品试验入口。当前构建会在页面和设置中显示短版源码修订；新 Service Worker 安装后，用户选择“刷新到新版”才更换已打开的前端，避免在输入中自动刷新。详见 [`pensieve-lab.md`](pensieve-lab.md)。
 
 1. 用 iPhone Safari 打开，选择共享菜单中的「添加到主屏幕」，从新图标进入后再开始记录。Safari 与主屏幕 App 可能使用不同的存储空间。
 2. AI 服务配置完成后，在设置输入私人试用口令。首次发送仍会单独说明当前会话经 Vercel 发送到 OpenAI；未选择开启时只在设备保存。

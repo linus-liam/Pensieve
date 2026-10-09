@@ -1,7 +1,9 @@
 import { LocalReflection } from "./components/reflection/LocalReflection";
 import { LocalSettings } from "./components/reflection/LocalSettings";
+import { LabUpdateBanner } from "./mobile/LabUpdateBanner";
+import { labVersion } from "./mobile/lab";
 import type { LocalInfo } from "./sessionTypes";
-import { localMode } from "./local";
+import { localMode, mobileMode } from "./local";
 import { pensieveTheme } from "./theme";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -357,6 +359,11 @@ function AuthenticatedApp() {
         <AppShell.Main className="app-content">
           <Container py="lg" size="sm">
             <Stack gap="md">
+              {mobileMode && <Group className="lab-bar" justify="space-between" wrap="nowrap">
+                <Text fw={650} size="sm">Pensieve Lab</Text>
+                <Text c="dimmed" ff="monospace" size="xs">{labVersion}</Text>
+              </Group>}
+              {mobileMode && <LabUpdateBanner />}
               {!localMode && <Group className="account-bar" gap="sm" justify="space-between" wrap="nowrap">
                 <Text c="dimmed" lineClamp={1} size="sm">
                   {localMode ? "聊天与历史保存在本机" : user?.email ?? "Google account"}
