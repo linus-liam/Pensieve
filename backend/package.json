@@ -2,6 +2,10 @@
   "name": "pensieve-backend",
   "version": "1.0.0",
   "type": "module",
+  "overrides": {
+    "proxy-addr": "2.0.8",
+    "qs": "6.16.0"
+  },
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
